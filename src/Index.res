@@ -2,11 +2,12 @@ open ReactDomExperimental
 
 %%raw(`import './Index.css';`)
 
-switch createRootWithId("root") {
-| Some(root) => root->render(
+switch ReactDOM.querySelector("#root") {
+| Some(root) => ReactDOM.render(
     <React.StrictMode>
       <App />
-    </React.StrictMode>
+    </React.StrictMode>,
+    root
   )
 | None => ()
 }

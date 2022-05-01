@@ -1,5 +1,5 @@
 {
-  "name": "my-rescript-app",
+  "name": "hmviz",
   "reason": {
     "react-jsx": 3
   },
@@ -20,10 +20,9 @@
   "suffix": ".bs.js",
   "namespace": true,
   "bs-dependencies": [
-    "reason-react"
+    "@rescript/react"
   ],
   "bs-dev-dependencies": [
-    "@glennsl/bs-jest",
     "bs-react-testing-library"
   ],
   "refmt": 3
