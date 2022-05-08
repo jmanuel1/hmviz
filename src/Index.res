@@ -1,5 +1,3 @@
-open ReactDomExperimental
-
 %%raw(`import './Index.css';`)
 
 switch ReactDOM.querySelector("#root") {
