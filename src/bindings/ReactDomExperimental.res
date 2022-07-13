@@ -5,7 +5,7 @@ external _getElementById: string => option<Dom.element> =
   "document.getElementById"
 
 @bs.module("react-dom")
-external createRoot: Dom.element => root = "unstable_createRoot"
+external createRoot: Dom.element => root = "createRoot"
 
 let createRootWithId = id =>
   switch _getElementById(id) {
@@ -14,7 +14,7 @@ let createRootWithId = id =>
   }
 
 @bs.module("react-dom")
-external createBlockingRoot: Dom.element => root = "unstable_createBlockingRoot"
+external createBlockingRoot: Dom.element => root = "createBlockingRoot"
 
 let createBlockingRootWithId = id =>
   switch _getElementById(id) {

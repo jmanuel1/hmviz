@@ -1,12 +1,12 @@
 type root
 
 @bs.module("react-dom")
-external createRoot: Dom.element => root = "unstable_createRoot"
+external createRoot: Dom.element => root = "createRoot"
 
 let createRootWithId: string => option<root>
 
 @bs.module("react-dom")
-external createBlockingRoot: Dom.element => root = "unstable_createBlockingRoot"
+external createBlockingRoot: Dom.element => root = "createBlockingRoot"
 
 let createBlockingRootWithId: string => option<root>
 
