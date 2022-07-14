@@ -92,32 +92,39 @@ type rel = GT
 
 let printRel : rel => string = _ => "GT"
 
-type rec clause = (pattern, expr)
-and expr = Match(expr, array<clause>) | Pair(expr, expr) | Name(token) | If(expr, expr, expr) | Rel(expr, rel, expr) | Application(expr, expr) | Cons(expr, expr)
+type rec clause<'ann> = (pattern, expr<'ann>)
+and expr<'ann> =
+  Match(expr<'ann>, array<clause<'ann>>, 'ann)
+  | Pair(expr<'ann>, expr<'ann>, 'ann)
+  | Name(token, 'ann)
+  | If(expr<'ann>, expr<'ann>, expr<'ann>, 'ann)
+  | Rel(expr<'ann>, rel, expr<'ann>, 'ann)
+  | Application(expr<'ann>, expr<'ann>, 'ann)
+  | Cons(expr<'ann>, expr<'ann>, 'ann)
 
-let rec printClause : clause => string = ((pattern, result)) => {
+let rec printClause : clause<'ann> => string = ((pattern, result)) => {
   `(${printPattern(pattern)}, ${printExpr(result)})`
 }
-and let printClauses : array<clause> => string = clauses => {
+and let printClauses : array<clause<'ann>> => string = clauses => {
   clauses->Js.Array2.map(printClause)->Js.Array2.joinWith(", ")
 }
-and let printExpr : expr => string = e => {
+and let printExpr : expr<'ann> => string = e => {
   switch e {
-    | Match(scrutinee, clauses) => `Match(${printExpr(scrutinee)}, ${printClauses(clauses)})`
-    | Pair(first, second) => `Pair(${printExpr(first)}, ${printExpr(second)})`
-    | Name(name) => `Name(${printToken(name)})`
-    | If(test, ifTrue, ifFalse) => `If(${printExpr(test)}, ${printExpr(ifTrue)}, ${printExpr(ifFalse)})`
-    | Rel(left, op, right) => `Rel(${printExpr(left)}, ${printRel(op)}, ${printExpr(right)})`
-    | Application(fun, arg) => `Application(${printExpr(fun)}, ${printExpr(arg)})`
-    | Cons(head, tail) => `Cons(${printExpr(head)}, ${printExpr(tail)})`
+    | Match(scrutinee, clauses, _) => `Match(${printExpr(scrutinee)}, ${printClauses(clauses)})`
+    | Pair(first, second, _) => `Pair(${printExpr(first)}, ${printExpr(second)})`
+    | Name(name, _) => `Name(${printToken(name)})`
+    | If(test, ifTrue, ifFalse, _) => `If(${printExpr(test)}, ${printExpr(ifTrue)}, ${printExpr(ifFalse)})`
+    | Rel(left, op, right, _) => `Rel(${printExpr(left)}, ${printRel(op)}, ${printExpr(right)})`
+    | Application(fun, arg, _) => `Application(${printExpr(fun)}, ${printExpr(arg)})`
+    | Cons(head, tail, _) => `Cons(${printExpr(head)}, ${printExpr(tail)})`
   }
 }
 
-type ast = Let(token, bool, array<token>, expr)
+type ast<'ann> = Let(token, bool, array<token>, expr<'ann>, 'ann)
 
-let printLet : ast => string = ast => {
+let printLet : ast<'ann> => string = ast => {
   switch ast {
-    | Let(name, isRec, params, rhs) => `Let(${printToken(name)}, ${if isRec { "true" } else { "false" }}, ${printTokens(params)}, ${printExpr(rhs)})`
+    | Let(name, isRec, params, rhs, _) => `Let(${printToken(name)}, ${if isRec { "true" } else { "false" }}, ${printTokens(params)}, ${printExpr(rhs)})`
   }
 }
 
@@ -250,12 +257,10 @@ let rec makePairPattern : array<pattern> => result<pattern, string> = patterns =
 
 let last : array<'a> => 'a = array => array[array->Js.Array2.length - 1]
 
-let makePairs : array<expr> => result<expr, string> = exprs => {
+let makePairs : array<expr<()>> => result<expr<()>, string> = exprs => {
   switch exprs->Js.Array.length {
   | 0 | 1 => Error("at least 2 elements")
-  // | 2 => Ok(Pair(exprs[0], exprs[1]))
-  // | _ => makePairs(Js.Array.sliceFrom(1, exprs))->Belt.Result.map(rest => Pair(exprs[0], rest))
-  | _ => Ok(exprs->Js.Array2.slice(~start=0, ~end_=-1)->Js.Array2.reduceRight((rest, el) => Pair(el, rest), exprs->last))
+  | _ => Ok(exprs->Js.Array2.slice(~start=0, ~end_=-1)->Js.Array2.reduceRight((rest, el) => Pair(el, rest, ()), exprs->last))
   }
 }
 
@@ -346,50 +351,50 @@ and let parsePattern : Lazy.t<parser<pattern>> =
   )
 
 
-let rec parseClause : Lazy.t<parser<clause>> = lazy (
+let rec parseClause : Lazy.t<parser<clause<'ann>>> = lazy (
   parseSymbol("|")->then(parsePattern->wrapLazy)->skip(parseSymbol("->"))->parserAnd(parseExpr->wrapLazy))
-and let parseMatch : Lazy.t<parser<expr>> =
+and let parseMatch : Lazy.t<parser<expr<()>>> =
   lazy (
     parseKeyword("match")
     ->then(parseExpr->wrapLazy)
     ->skip(parseKeyword("with"))
     ->parserAnd(parseClause->wrapLazy->many)
     ->map(((scrutinee, clauses)) => {
-      Match(scrutinee, clauses)
+      Match(scrutinee, clauses, ())
     })
     ->or(parseIf->wrapLazy)
   )
-and let parseIf : Lazy.t<parser<expr>> = lazy (
+and let parseIf : Lazy.t<parser<expr<()>>> = lazy (
   parseKeyword("if")
   ->then(parseExpr->wrapLazy)
   ->skip(parseKeyword("then"))
   ->parserAnd(parseExpr->wrapLazy)
   ->skip(parseKeyword("else"))
   ->parserAnd(parseExpr->wrapLazy)
-  ->map((((test, ifTrue), ifFalse)) => If(test, ifTrue, ifFalse))
+  ->map((((test, ifTrue), ifFalse)) => If(test, ifTrue, ifFalse, ()))
   ->trace("if")
   ->or(parseConjunction->wrapLazy)
 )
 // & &&
-and let parseConjunction : Lazy.t<parser<expr>> = lazy (
+and let parseConjunction : Lazy.t<parser<expr<'ann>>> = lazy (
   parseRelational->wrapLazy
 )
 // =… <… >… |… &… $… !=
-and let parseRelational : Lazy.t<parser<expr>> = lazy (
+and let parseRelational : Lazy.t<parser<expr<()>>> = lazy (
   parseCons->wrapLazy
   ->parserAnd(parseSymbol(">")->return(GT)->parserAnd(parseCons->wrapLazy)->many)
-  ->map(((first, opPairs)) => opPairs->Belt.Array.reduce(first, (expr, (op, operand)) => Rel(expr, op, operand)))
+  ->map(((first, opPairs)) => opPairs->Belt.Array.reduce(first, (expr, (op, operand)) => Rel(expr, op, operand, ())))
   ->trace("relational")
 )
-and let parseNegation : Lazy.t<parser<expr>> = lazy (
+and let parseNegation : Lazy.t<parser<expr<'ann>>> = lazy (
   parseApplication->wrapLazy
 )
-and let parseApplication : Lazy.t<parser<expr>> = lazy (
+and let parseApplication : Lazy.t<parser<expr<()>>> = lazy (
   parsePrimary->wrapLazy
   ->parserAnd(parsePrimary->wrapLazy->many)
-  ->map(((fun, args)) => args->Belt.Array.reduce(fun, (expr, arg) => Application(expr, arg)))
+  ->map(((fun, args)) => args->Belt.Array.reduce(fun, (expr, arg) => Application(expr, arg, ())))
 )
-and let parsePrimary : Lazy.t<parser<expr>> = lazy (
+and let parsePrimary : Lazy.t<parser<expr<()>>> = lazy (
   alt([
     parseSymbol("(")
     ->then(parseExpr->wrapLazy->sepBy(parseSymbol(",")))
@@ -399,25 +404,25 @@ and let parsePrimary : Lazy.t<parser<expr>> = lazy (
         | _ => makePairs(exprs)
       }
     )->skip(parseSymbol(")")),
-    parseID->map(id => Name(id)),
+    parseID->map(id => Name(id, ())),
   ])
 )
 // ::
-and let parseCons : Lazy.t<parser<expr>> = lazy (
+and let parseCons : Lazy.t<parser<expr<()>>> = lazy (
   parseNegation->wrapLazy
   ->skip(parseSymbol("::"))
   ->parserAnd(parseCons->wrapLazy)
-  ->map(((head, tail)) => Cons(head, tail))
+  ->map(((head, tail)) => Cons(head, tail, ()))
   ->or(parseNegation->wrapLazy)
 )
-and let parseExpr : Lazy.t<parser<expr>> = lazy (alt([
+and let parseExpr : Lazy.t<parser<expr<'ann>>> = lazy (alt([
   parseMatch->wrapLazy,
   (parseIf->wrapLazy),
   (parseRelational->wrapLazy),
   (parseApplication->wrapLazy)
 ])->trace("expression"))
 
-let parseLet : parser<ast> = {
+let parseLet : parser<ast<()>> = {
   parseKeyword("let")
     ->then(parseKeyword("rec")->optional)
     ->parserAnd(parseID)
@@ -425,7 +430,7 @@ let parseLet : parser<ast> = {
     ->skip(parseSymbol("="))
     ->parserAnd(parseExpr->wrapLazy)
     ->map(((((recToken, name), params), rhs)) => {
-      Let(name, recToken->Belt.Option.isSome, params, rhs)
+      Let(name, recToken->Belt.Option.isSome, params, rhs, ())
     })
 }
 
@@ -436,7 +441,7 @@ let fail : parser<'a> => ~msg:string=? => parser<()> = (parser, ~msg="error", to
 
 let parseEOF : parser<()> = parseNotEOF->fail(~msg="end of file")
 
-let parse : array<token> => result<ast, (string, parserState)> = tokens => {
+let parse : array<token> => result<ast<()>, (string, parserState)> = tokens => {
   parseLet->skip(parseEOF, tokens, {index: 0})->Belt.Result.map(((ast, _)) => ast)
 }
 
