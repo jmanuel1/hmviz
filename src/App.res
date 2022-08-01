@@ -449,6 +449,19 @@ type typeVar = int
 
 type rec typeType = TypeVar(typeVar) | TypeInt | TypeFloat | TypeString | TypeFun(typeType, typeType) | TypePair(typeType, typeType) | TypeList(typeType) | TypeBool
 
+let rec typeToString : typeType => string = ty => {
+  switch ty {
+    | TypeVar(v) => `TypeVar(${v->Belt.Int.toString})`
+    | TypeInt => "TypeInt"
+    | TypeFloat => "TypeFloat"
+    | TypeString => "TypeString"
+    | TypeFun(arg, ret) => `TypeFun(${typeToString(arg)}, ${typeToString(ret)})`
+    | TypePair(first, second) => `TypeFun(${typeToString(first)}, ${typeToString(second)})`
+    | TypeList(el) => `TypeList(${typeToString(el)})`
+    | TypeBool => "TypeBool"
+  }
+}
+
 type context = Belt.Map.String.t<typeType>
 
 type constraints = Belt.Map.Int.t<typeType>
@@ -783,7 +796,14 @@ let make = () => {
         | Ok(ast) => {
           Js.log(ast)
           Js.log(printLet(ast))
-          Js.log(generateInferenceSteps(ast)->TracedState.toStateArray)
+          generateInferenceSteps(ast)->TracedState.toStateArray->Js.Array2.forEach(step => {
+            Js.log("step:")
+            Js.log(step)
+            Js.log("constraints:")
+            step.constraints->Belt.Map.Int.forEach((v, t) => {
+              Js.log(`var: ${v->Belt.Int.toString}, type: ${typeToString(t)}`)
+            })
+          })
         }
         | Error(msg, state) => {
           Js.log(`expected ${msg}, saw following token at token index ${state.index->Belt.Int.toString}:`)
