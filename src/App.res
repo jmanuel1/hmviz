@@ -783,7 +783,7 @@ let make = () => {
         | Ok(ast) => {
           Js.log(ast)
           Js.log(printLet(ast))
-          Js.log(generateInferenceSteps(ast))
+          Js.log(generateInferenceSteps(ast)->TracedState.toStateArray)
         }
         | Error(msg, state) => {
           Js.log(`expected ${msg}, saw following token at token index ${state.index->Belt.Int.toString}:`)
