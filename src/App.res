@@ -18,7 +18,7 @@ let printToken : token => string = t => `"${t.lexeme}"`
 let printTokens : array<token> => string = ts => "[" ++ ts->Js.Array2.map(printToken)->Js.Array2.joinWith(", ") ++ "]"
 
 let advance : (tokenizerState, int) => tokenizerState = (state, incr) => {
-  {...state, index: state.index + incr}
+  {index: state.index + incr}
 }
 
 let rec nextToken : (string, tokenizerState) => option<(token, tokenizerState)> = (string, state) => {
@@ -129,7 +129,7 @@ let printLet : ast<'ann> => string = ast => {
 }
 
 let parserAdvance : (parserState, int) => parserState = (state, incr) => {
-  {...state, index: state.index + incr}
+  {index: state.index + incr}
 }
 
 type parser<'a> = (array<token>, parserState) => result<('a, parserState), (string, parserState)>
@@ -280,7 +280,8 @@ let fallibleMap : parser<'a> => ('a => result<'b, string>) => parser<'b> = (pars
 let or : parser<'a> => parser<'a> => parser<'a> = (first, second, tokens, state) => {
   switch first(tokens, state) {
     | Ok(res) => Ok(res)
-    | Error(err) => second(tokens, state)
+    // TODO: Construct an error message that includes content from the first.
+    | Error(_) => second(tokens, state)
   }
 }
 
@@ -321,7 +322,7 @@ let rec parsePairPattern : Lazy.t<parser<pattern>> =
 and let parseListPattern : Lazy.t<parser<pattern>> =
   lazy (
     parseSymbol("[")
-    ->then(parsePattern->wrapLazy->sepBy(parseSymbol(",")))
+    ->then(parsePattern->wrapLazy->sepBy(parseSymbol(","), ~min=0))
     ->skip(parseSymbol("]"))
     ->map(ps => ListPat(ps))
     ->trace("list pattern")
@@ -397,7 +398,7 @@ and let parseApplication : Lazy.t<parser<expr<()>>> = lazy (
 and let parsePrimary : Lazy.t<parser<expr<()>>> = lazy (
   alt([
     parseSymbol("(")
-    ->then(parseExpr->wrapLazy->sepBy(parseSymbol(",")))
+    ->then(parseExpr->wrapLazy->sepBy(parseSymbol(","), ~min=1))
     ->fallibleMap(exprs =>
       switch exprs->Js.Array.length {
         | 1 => Ok(exprs[0])
@@ -575,6 +576,7 @@ let stepInfer : typeInferer<()> = {
         | (TypeVar(v), TypeVar(w)) if v == w =>
           TracedState.return(())
         | (TypeVar(v), _) => {
+          // FIXME: Occurs check
           let constraints = constraints->Belt.Map.Int.map(ty => ty->substitute(Belt.Map.Int.fromArray([(v, t2)])))
           let constraints = constraints->Belt.Map.Int.set(v, t2)
           // TODO: Substitute types in ast?
