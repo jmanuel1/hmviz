@@ -1,5 +1,14 @@
 type tokenType = WS | Keyword | ID | Symbol
 
+let tokenTypeToString = (ty: tokenType): string => {
+  switch ty {
+    | WS => "WS"
+    | Keyword => "Keyword"
+    | ID => "ID"
+    | Symbol => "Symbol"
+  }
+}
+
 type token = {
   type_: tokenType,
   lexeme: string

@@ -9,6 +9,7 @@ let make = () => {
   open ArrayUtil
 
   let (codeInput, setCodeInput) = React.useState(_ => "")
+  let (typedAST, setTypedAST) = React.useState(_ => None)
 
   let onCodeInputChange = event => {
     ReactEvent.Form.preventDefault(event)
@@ -28,7 +29,8 @@ let make = () => {
         | Ok(ast) => {
           Js.log(ast)
           Js.log(printLet(ast))
-          generateInferenceSteps(ast)->TracedState.toStateArray->Js.Array2.forEach(step => {
+          let steps = generateInferenceSteps(ast)->TracedState.toStateArray
+          steps->Js.Array2.forEach(step => {
             Js.log("step:")
             Js.log(step)
             Js.log("constraints:")
@@ -36,6 +38,7 @@ let make = () => {
               Js.log(`var: ${v->Belt.Int.toString}, type: ${typeToString(t)}`)
             })
           })
+          setTypedAST(_ => Some((steps->last).typedAST))
         }
         | Error(msg, state) => {
           Js.log(`expected ${msg}, saw following token at token index ${state.index->Belt.Int.toString}:`)
@@ -53,5 +56,11 @@ let make = () => {
       </label>
       <button type_="submit">{React.string("Infer types")}</button>
     </form>
+    {
+      switch typedAST {
+        | Some(typedAST) => <ASTTree ast=typedAST />
+        | None => React.null
+      }
+    }
   </div>
 }
