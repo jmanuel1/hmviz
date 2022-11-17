@@ -40,7 +40,7 @@ let makeAttributes = (~ty: option<Type.typeType>=?, ~constraints: Type.constrain
 
   others->Js.Dict.set("nodeType", stringToAttributeValue(nodeType))
   switch ty {
-    | Some(ty) => others->Js.Dict.set("type", stringToAttributeValue(typeToString(ty->substitute(constraints))))
+    | Some(ty) => others->Js.Dict.set("type", stringToAttributeValue(ty->substitute(constraints)->toFriendlyString))
     | _ => ()
   }
 

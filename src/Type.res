@@ -15,6 +15,25 @@ let rec typeToString : typeType => string = ty => {
   }
 }
 
+let rec toFriendlyString = (ty: typeType): string => {
+  switch ty {
+    | TypeVar(v) => `'t${v->Belt.Int.toString}`
+    | TypeInt => "int"
+    | TypeFloat => "float"
+    | TypeString => "string"
+    | TypeFun(arg, ret) => {
+      let argString = switch arg {
+        | TypeFun(_, _) => `(${toFriendlyString(arg)})`
+        | _ => toFriendlyString(arg)
+      }
+      `${argString} -> ${toFriendlyString(ret)}`
+    }
+    | TypePair(first, second) => `(${toFriendlyString(first)}, ${toFriendlyString(second)})`
+    | TypeList(el) => `${toFriendlyString(el)} list`
+    | TypeBool => "bool"
+  }
+}
+
 type context = Belt.Map.String.t<typeType>
 
 type constraints = Belt.Map.Int.t<typeType>
