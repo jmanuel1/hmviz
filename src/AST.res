@@ -80,6 +80,7 @@ let tokenize : string => option<array<token>> = string => {
 type rel = GT
 
 let printRel : rel => string = _ => "GT"
+let relToFriendlyString = (_: rel): string => ">"
 
 type rec pattern = PairPat(pattern, pattern) | ListPat(array<pattern>) | Wildcard | ConsPat(pattern, pattern) | NamePat(token)
 

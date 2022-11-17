@@ -107,12 +107,57 @@ and exprToRawNodeDatum = (e: AST.expr<Type.typeType>): Tree.rawNodeDatum => {
       children->Js.Array2.unshift(scrutinee)->ignore
       {attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("match")), ("type", Tree.stringToAttributeValue(Type.typeToString(ty)))]), children, name: "match"}
     }
-    | Pair(first, second, ty) => {attributes: Js.Dict.fromArray([]), children: [], name: "expr"}
-    | Name(name, ty) => {attributes: Js.Dict.fromArray([]), children: [], name: "expr"}
-    | If(test, ifTrue, ifFalse, ty) => {attributes: Js.Dict.fromArray([]), children: [], name: "expr"}
-    | Rel(left, op, right, ty) => {attributes: Js.Dict.fromArray([]), children: [], name: "expr"}
-    | Application(fun, arg, ty) => {attributes: Js.Dict.fromArray([]), children: [], name: "expr"}
-    | Cons(head, tail, ty) => {attributes: Js.Dict.fromArray([]), children: [], name: "expr"}
+    | Pair(first, second, ty) => {
+      let first = exprToRawNodeDatum(first)
+      let second = exprToRawNodeDatum(second)
+      {
+        attributes: makeAttributes(~ty, "pair"),
+        children: [first, second],
+        name: "pair"
+      }
+    }
+    | Name(name, ty) => {
+      attributes: makeAttributes(~ty, "name"),
+      children: [],
+      name: name.lexeme
+    }
+    | If(test, ifTrue, ifFalse, ty) => {
+      let test = exprToRawNodeDatum(test)
+      let ifTrue = exprToRawNodeDatum(ifTrue)
+      let ifFalse = exprToRawNodeDatum(ifFalse)
+      {
+        attributes: makeAttributes(~ty, "if"),
+        children: [test, ifTrue, ifFalse],
+        name: "if"
+      }
+    }
+    | Rel(left, op, right, ty) => {
+      let left = exprToRawNodeDatum(left)
+      let right = exprToRawNodeDatum(right)
+      {
+        attributes: makeAttributes(~ty, "rel"),
+        children: [left, right],
+        name: AST.relToFriendlyString(op)
+      }
+    }
+    | Application(fun, arg, ty) => {
+      let fun = exprToRawNodeDatum(fun)
+      let arg = exprToRawNodeDatum(arg)
+      {
+        attributes: makeAttributes(~ty, "app"),
+        children: [fun, arg],
+        name: "function application"
+      }
+    }
+    | Cons(head, tail, ty) => {
+      let head = exprToRawNodeDatum(head)
+      let tail = exprToRawNodeDatum(tail)
+      {
+        attributes: makeAttributes(~ty, "cons"),
+        children: [head, tail],
+        name: "::"
+      }
+    }
   }
 }
 
