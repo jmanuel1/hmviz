@@ -1,7 +1,5 @@
 %%raw(`import './App.css';`)
 
-@bs.module("./logo.svg") external logo: string = "default"
-
 @react.component
 let make = () => {
   open AST
@@ -10,6 +8,7 @@ let make = () => {
 
   let (codeInput, setCodeInput) = React.useState(_ => "")
   let (typedAST, setTypedAST) = React.useState(_ => None)
+  let (constraints, setConstraints) = React.useState(_ => Belt.Map.Int.empty)
 
   let onCodeInputChange = event => {
     ReactEvent.Form.preventDefault(event)
@@ -19,16 +18,12 @@ let make = () => {
 
   let onSubmitCodeInput = event => {
     ReactEvent.Form.preventDefault(event)
-    Js.log(codeInput)
     let tokens = tokenize(codeInput)
-    Js.log(tokens)
 
     tokens->Belt.Option.map(tokens => {
       let ast = parse(tokens)
       switch ast {
         | Ok(ast) => {
-          Js.log(ast)
-          Js.log(printLet(ast))
           let steps = generateInferenceSteps(ast)->TracedState.toStateArray
           steps->Js.Array2.forEach(step => {
             Js.log("step:")
@@ -39,6 +34,7 @@ let make = () => {
             })
           })
           setTypedAST(_ => Some((steps->last).typedAST))
+          setConstraints(_ => (steps->last).constraints)
         }
         | Error(msg, state) => {
           Js.log(`expected ${msg}, saw following token at token index ${state.index->Belt.Int.toString}:`)
@@ -58,7 +54,7 @@ let make = () => {
     </form>
     {
       switch typedAST {
-        | Some(typedAST) => <ASTTree ast=typedAST />
+        | Some(typedAST) => <ASTTree ast=typedAST constraints />
         | None => React.null
       }
     }

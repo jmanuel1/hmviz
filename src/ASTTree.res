@@ -31,15 +31,16 @@ let tokenToRawNodeDatum = (token: AST.token): Tree.rawNodeDatum => {
   {attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue(`${AST.tokenTypeToString(token.type_)} token`))]), children: [], name: token.lexeme}
 }
 
-let makeAttributes = (~ty: option<Type.typeType>=?, ~others: Tree.attributeDict=Js.Dict.empty(), nodeType: string): Tree.attributeDict => {
+let makeAttributes = (~ty: option<Type.typeType>=?, ~constraints: Type.constraints=Belt.Map.Int.empty, ~others: Tree.attributeDict=Js.Dict.empty(), nodeType: string): Tree.attributeDict => {
   open Tree
+  open Type
 
   // Copy the dictionary so callers aren't surprised by mutation.
   let others = others->Js.Dict.entries->Js.Dict.fromArray
 
   others->Js.Dict.set("nodeType", stringToAttributeValue(nodeType))
   switch ty {
-    | Some(ty) => others->Js.Dict.set("type", stringToAttributeValue(Type.typeToString(ty)))
+    | Some(ty) => others->Js.Dict.set("type", stringToAttributeValue(typeToString(ty->substitute(constraints))))
     | _ => ()
   }
 
@@ -89,71 +90,72 @@ let rec patternToRawNodeDatum = (pat: AST.pattern): Tree.rawNodeDatum => {
   }
 }
 
-let rec clauseToRawNodeDatum = (clause: AST.clause<Type.typeType>): Tree.rawNodeDatum => {
+let rec clauseToRawNodeDatum = (clause: AST.clause<Type.typeType>, constraints: Type.constraints): Tree.rawNodeDatum => {
   let (pattern, body) = clause
   let pattern = patternToRawNodeDatum(pattern)
-  let body = exprToRawNodeDatum(body)
+  let body = exprToRawNodeDatum(body, constraints)
   {
     attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("clause"))]),
     children: [pattern, body],
     name: "pattern matching clause"
   }
 }
-and exprToRawNodeDatum = (e: AST.expr<Type.typeType>): Tree.rawNodeDatum => {
+and exprToRawNodeDatum = (e: AST.expr<Type.typeType>, constraints: Type.constraints): Tree.rawNodeDatum => {
   switch e {
     | Match(scrutinee, clauses, ty) => {
-      let scrutinee = exprToRawNodeDatum(scrutinee)
-      let children = clauses->Js.Array2.map(clauseToRawNodeDatum)
+      let scrutinee = exprToRawNodeDatum(scrutinee, constraints)
+      let children = clauses->Js.Array2.map(c => clauseToRawNodeDatum(c, constraints))
       children->Js.Array2.unshift(scrutinee)->ignore
-      {attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("match")), ("type", Tree.stringToAttributeValue(Type.typeToString(ty)))]), children, name: "match"}
+      let attributes = makeAttributes(~ty, ~constraints, "match")
+      {attributes, children, name: "match"}
     }
     | Pair(first, second, ty) => {
-      let first = exprToRawNodeDatum(first)
-      let second = exprToRawNodeDatum(second)
+      let first = exprToRawNodeDatum(first, constraints)
+      let second = exprToRawNodeDatum(second, constraints)
       {
-        attributes: makeAttributes(~ty, "pair"),
+        attributes: makeAttributes(~ty, ~constraints, "pair"),
         children: [first, second],
         name: "pair"
       }
     }
     | Name(name, ty) => {
-      attributes: makeAttributes(~ty, "name"),
+      attributes: makeAttributes(~ty, ~constraints, "name"),
       children: [],
       name: name.lexeme
     }
     | If(test, ifTrue, ifFalse, ty) => {
-      let test = exprToRawNodeDatum(test)
-      let ifTrue = exprToRawNodeDatum(ifTrue)
-      let ifFalse = exprToRawNodeDatum(ifFalse)
+      let test = exprToRawNodeDatum(test, constraints)
+      let ifTrue = exprToRawNodeDatum(ifTrue, constraints)
+      let ifFalse = exprToRawNodeDatum(ifFalse, constraints)
       {
-        attributes: makeAttributes(~ty, "if"),
+        attributes: makeAttributes(~ty, ~constraints, "if"),
         children: [test, ifTrue, ifFalse],
         name: "if"
       }
     }
     | Rel(left, op, right, ty) => {
-      let left = exprToRawNodeDatum(left)
-      let right = exprToRawNodeDatum(right)
+      let left = exprToRawNodeDatum(left, constraints)
+      let right = exprToRawNodeDatum(right, constraints)
       {
-        attributes: makeAttributes(~ty, "rel"),
+        attributes: makeAttributes(~ty, ~constraints, "rel"),
         children: [left, right],
         name: AST.relToFriendlyString(op)
       }
     }
     | Application(fun, arg, ty) => {
-      let fun = exprToRawNodeDatum(fun)
-      let arg = exprToRawNodeDatum(arg)
+      let fun = exprToRawNodeDatum(fun, constraints)
+      let arg = exprToRawNodeDatum(arg, constraints)
       {
-        attributes: makeAttributes(~ty, "app"),
+        attributes: makeAttributes(~ty, ~constraints, "app"),
         children: [fun, arg],
         name: "function application"
       }
     }
     | Cons(head, tail, ty) => {
-      let head = exprToRawNodeDatum(head)
-      let tail = exprToRawNodeDatum(tail)
+      let head = exprToRawNodeDatum(head, constraints)
+      let tail = exprToRawNodeDatum(tail, constraints)
       {
-        attributes: makeAttributes(~ty, "cons"),
+        attributes: makeAttributes(~ty, ~constraints, "cons"),
         children: [head, tail],
         name: "::"
       }
@@ -161,14 +163,15 @@ and exprToRawNodeDatum = (e: AST.expr<Type.typeType>): Tree.rawNodeDatum => {
   }
 }
 
-let astToRawNodeDatum: AST.ast<Type.typeType> => Tree.rawNodeDatum = ast => {
+let astToRawNodeDatum = (ast: AST.ast<Type.typeType>, constraints: Type.constraints): Tree.rawNodeDatum => {
   open AST
 
   switch ast {
     | Let(name, isRec, params, body, ty) => {
       let children = params->Js.Array2.map(tokenToRawNodeDatum)
-      children->Js.Array2.push(exprToRawNodeDatum(body))->ignore
-      {attributes: Js.Dict.fromArray([("rec", Tree.boolToAttributeValue(isRec)), ("type", Tree.stringToAttributeValue(Type.typeToString(ty))), ("nodeType", Tree.stringToAttributeValue("let"))]), children, name: name.lexeme}
+      children->Js.Array2.push(exprToRawNodeDatum(body, constraints))->ignore
+      let attributes = makeAttributes(~ty, ~constraints, ~others=Js.Dict.fromArray([("rec", Tree.boolToAttributeValue(isRec))]), "let")
+      {attributes, children, name: name.lexeme}
     }
   }
 }
@@ -178,7 +181,7 @@ let astToRawNodeDatum: AST.ast<Type.typeType> => Tree.rawNodeDatum = ast => {
 @bs.get external get_height: Dom.domRect => int = "height"
 
 @react.component
-let make = (~ast: AST.ast<Type.typeType>) => {
+let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   open Tree
   let (translation, setTranslation) = React.useState(_ => {x: 0, y: 0})
   let container = React.useRef(Js.Nullable.null)
@@ -192,6 +195,6 @@ let make = (~ast: AST.ast<Type.typeType>) => {
   }, [container.current])
 
   <div id="ast" ref={ReactDOM.Ref.domRef(container)}>
-    <Tree data=astToRawNodeDatum(ast) translate=translation orientation=#vertical />
+    <Tree data=astToRawNodeDatum(ast, constraints) orientation=#vertical dimensions />
   </div>
 }
