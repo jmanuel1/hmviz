@@ -23,8 +23,35 @@ module Tree = {
 
   type orientation = [ #horizontal | #vertical ]
 
+  type onUpdateTarget = {
+    node: Js.null<rawNodeDatum>, // supertype of react-d3-tree TreeNodeDatum
+    translate: translation, // react-d3-tree Point
+    zoom: float,
+  }
+  type onUpdate = onUpdateTarget => ()
+
+  type dimensions = {height: float, width: float}
+
+  type pathFunctionOption = [ #diagonal | #elbow | #straight | #step ]
+
+  type customNodeElementProps = {
+    nodeDatum: rawNodeDatum,
+    hierarchyPointNode: {"x": float, "y": float}, // TODO: Get d3 bindings
+  }
+
+  type renderCustomNodeElementFn = customNodeElementProps => React.element
+
   @bs.module("react-d3-tree") @react.component
-  external make: (~data: rawNodeDatum, ~translate: translation=?, ~orientation: orientation=?) => React.element = "default"
+  external make: (
+    ~data: rawNodeDatum,
+    ~translate: translation=?,
+    ~orientation: orientation=?,
+    ~onUpdate: onUpdate=?,
+    ~zoom: float=?,
+    ~dimensions: dimensions=?,
+    ~pathFunc: pathFunctionOption=?, // react-de-tree PathFunctionOption | PathFunction
+    ~renderCustomNodeElement: renderCustomNodeElementFn=?
+  ) => React.element = "default"
 }
 
 let tokenToRawNodeDatum = (token: AST.token): Tree.rawNodeDatum => {
@@ -180,6 +207,19 @@ let astToRawNodeDatum = (ast: AST.ast<Type.typeType>, constraints: Type.constrai
 @bs.get external get_width: Dom.domRect => int = "width"
 @bs.get external get_height: Dom.domRect => int = "height"
 
+let renderNode: Tree.renderCustomNodeElementFn = ({nodeDatum, hierarchyPointNode}) => {
+  open ReactDOM
+  let divStyle = Style.make(~display="flex", ~alignItems="unsafe center", ~justifyContent="unsafe center", ~textAlign="center", ~height="60px", ~width="120px", ~overflow="visible", ~overflowWrap="break-word", ())
+  <g transform="translate(-60, -30)" width="120" height="60" style=Style.make(~overflow="visible", ())>
+    <rect width="120" height="60" fill="#fff" />
+    <foreignObject width="120" height="60" style=Style.make(~overflow="visible", ())>
+      <div xmlns="http://www.w3.org/1999/xhtml" style=divStyle>
+        <div style=Style.make(~margin="auto", ~width="120px", ())>{nodeDatum.name->React.string}</div>
+      </div>
+    </foreignObject>
+  </g>
+}
+
 @react.component
 let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   open Tree
@@ -195,6 +235,6 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   }, [container.current])
 
   <div id="ast" ref={ReactDOM.Ref.domRef(container)}>
-    <Tree data=astToRawNodeDatum(ast, constraints) orientation=#vertical dimensions />
+    <Tree data=astToRawNodeDatum(ast, constraints) orientation=#vertical dimensions renderCustomNodeElement=renderNode />
   </div>
 }
