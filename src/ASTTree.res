@@ -253,13 +253,17 @@ module Node = {
 @react.component
 let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   open Tree
-  let (translation, setTranslation) = React.useState(_ => {x: 0, y: 0})
   let container = React.useRef(Js.Nullable.null)
+  let (dimensions, setDimensions) = React.useState(_ => {height: 0.0, width: 0.0})
 
   React.useEffect1(() => {
     container.current->Js.Nullable.toOption->Belt.Option.map((dom: Dom.element) => {
       let rect: Dom.domRect = dom->getBoundingClientRect
-      setTranslation(_ => {x: rect->get_width / 2, y: rect->get_height / 2})
+      let treeRect = dom->querySelector("g")->Js.Null.getExn->getBoundingClientRect
+      // Center the tree rect.
+      setDimensions(_ => {height: rect->get_height, width: rect->get_width})
+      let svg = dom->querySelector("svg")->Js.Null.getExn
+      svg->setAttributeNS(Js.Null.empty, "viewBox", `${-.(treeRect->get_width/.2.0)->Js.Float.toString} 0 ${treeRect->get_width->Js.Float.toString} ${treeRect->get_height->Js.Float.toString}`)
     })->ignore
     None
   }, [container.current])
