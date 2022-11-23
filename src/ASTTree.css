@@ -1,3 +1,31 @@
 #ast {
   height: 100%;
 }
+
+.rd3t-node, .rd3t-leaf-node {
+  --node-width: 120px;
+}
+
+.rd3t-node *, .rd3t-leaf-node * {
+  overflow: visible;
+  overflow-wrap: break-word;
+  width: var(--node-width);
+}
+
+.rd3t-node rect, .rd3t-leaf-node rect {
+  fill: #fff;
+  width: var(--node-width);
+}
+
+.rd3t-node foreignObject > div, .rd3t-leaf-node foreignObject > div {
+  align-items: center;
+  display: flex;
+  fill: #fff;
+  justify-content: center;
+  text-align: center;
+  width: var(--node-width);
+}
+
+.rd3t-node .text, .rd3t-leaf-node .text {
+  padding: 8px;
+}

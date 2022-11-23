@@ -235,12 +235,12 @@ module Node = {
       None
     }, [textContainer.current])
 
-    let divStyle = Style.make(~display="flex", ~alignItems="unsafe center", ~justifyContent="unsafe center", ~textAlign="center", ~height=heightPx, ~width="120px", ~overflow="visible", ~overflowWrap="break-word", ())
-    <g transform=translation width="120" height=heightString style=Style.make(~overflow="visible", ())>
-      <rect width="120" height=heightString fill="#fff" />
-      <foreignObject width="120" height=heightString style=Style.make(~overflow="visible", ())>
+    let divStyle = Style.make(~height=heightPx, ())
+    <g transform=translation height=heightString>
+      <rect height=heightString />
+      <foreignObject height=heightString>
         <div xmlns="http://www.w3.org/1999/xhtml" style=divStyle>
-          <div style=Style.make(~padding="8px", ~width="120px", ()) ref={ReactDOM.Ref.domRef(textContainer)}>
+          <div className="text" ref=ReactDOM.Ref.domRef(textContainer)>
             nodeTypeDisplay
             {nodeDatum.name->React.string}
           </div>
