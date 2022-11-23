@@ -9,7 +9,7 @@ let rec typeToString : typeType => string = ty => {
     | TypeFloat => "TypeFloat"
     | TypeString => "TypeString"
     | TypeFun(arg, ret) => `TypeFun(${typeToString(arg)}, ${typeToString(ret)})`
-    | TypePair(first, second) => `TypeFun(${typeToString(first)}, ${typeToString(second)})`
+    | TypePair(first, second) => `TypePair(${typeToString(first)}, ${typeToString(second)})`
     | TypeList(el) => `TypeList(${typeToString(el)})`
     | TypeBool => "TypeBool"
   }
