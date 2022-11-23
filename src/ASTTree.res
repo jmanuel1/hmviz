@@ -57,10 +57,11 @@ module Tree = {
 }
 
 let tokenToRawNodeDatum = (token: AST.token): Tree.rawNodeDatum => {
-  {attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue(`${AST.tokenTypeToString(token.type_)} token`))]), children: [], name: token.lexeme}
+  open Tree
+  {attributes: Js.Dict.fromArray([("nodeType", stringToAttributeValue(`${AST.tokenTypeToString(token.type_)} token`)), ("mainValueName", stringToAttributeValue("lexeme"))]), children: [], name: token.lexeme}
 }
 
-let makeAttributes = (~ty: option<Type.typeType>=?, ~constraints: Type.constraints=Belt.Map.Int.empty, ~others: Tree.attributeDict=Js.Dict.empty(), nodeType: string): Tree.attributeDict => {
+let makeAttributes = (~ty: option<Type.typeType>=?, ~constraints: Type.constraints=Belt.Map.Int.empty, ~mainValueName: option<string>=?, ~others: Tree.attributeDict=Js.Dict.empty(), nodeType: string): Tree.attributeDict => {
   open Tree
   open Type
 
@@ -68,8 +69,14 @@ let makeAttributes = (~ty: option<Type.typeType>=?, ~constraints: Type.constrain
   let others = others->Js.Dict.entries->Js.Dict.fromArray
 
   others->Js.Dict.set("nodeType", stringToAttributeValue(nodeType))
+
   switch ty {
     | Some(ty) => others->Js.Dict.set("type", stringToAttributeValue(ty->substitute(constraints)->toFriendlyString))
+    | _ => ()
+  }
+
+  switch mainValueName {
+    | Some(mainValueName) => others->Js.Dict.set("mainValueName", stringToAttributeValue(mainValueName))
     | _ => ()
   }
 
@@ -82,7 +89,7 @@ let rec patternToRawNodeDatum = (pat: AST.pattern): Tree.rawNodeDatum => {
       let first = patternToRawNodeDatum(first)
       let second = patternToRawNodeDatum(second)
       {
-        attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("pairPattern"))]),
+        attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("PairPattern"))]),
         children: [first, second],
         name: "(,)"
       }
@@ -90,13 +97,13 @@ let rec patternToRawNodeDatum = (pat: AST.pattern): Tree.rawNodeDatum => {
     | ListPat(patterns) => {
       let patterns = patterns->Js.Array2.map(patternToRawNodeDatum)
       {
-        attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("listPattern"))]),
+        attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("ListPattern"))]),
         children: patterns,
         name: "[]"
       }
     }
     | Wildcard => {
-      attributes: makeAttributes("wildcardPattern"),
+      attributes: makeAttributes("WildcardPattern"),
       children: [],
       name: "_"
     }
@@ -104,14 +111,14 @@ let rec patternToRawNodeDatum = (pat: AST.pattern): Tree.rawNodeDatum => {
       let head = patternToRawNodeDatum(head)
       let tail = patternToRawNodeDatum(tail)
       {
-        attributes: makeAttributes("consPattern"),
+        attributes: makeAttributes("ConsPattern"),
         children: [head, tail],
         name: "::"
       }
     }
     | NamePat(name) => {
       {
-        attributes: makeAttributes("namePattern"),
+        attributes: makeAttributes(~mainValueName="name", "NamePattern"),
         children: [],
         name: name.lexeme
       }
@@ -124,7 +131,7 @@ let rec clauseToRawNodeDatum = (clause: AST.clause<Type.typeType>, constraints: 
   let pattern = patternToRawNodeDatum(pattern)
   let body = exprToRawNodeDatum(body, constraints)
   {
-    attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("clause"))]),
+    attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("Clause"))]),
     children: [pattern, body],
     name: "pattern matching clause"
   }
@@ -135,20 +142,20 @@ and exprToRawNodeDatum = (e: AST.expr<Type.typeType>, constraints: Type.constrai
       let scrutinee = exprToRawNodeDatum(scrutinee, constraints)
       let children = clauses->Js.Array2.map(c => clauseToRawNodeDatum(c, constraints))
       children->Js.Array2.unshift(scrutinee)->ignore
-      let attributes = makeAttributes(~ty, ~constraints, "match")
+      let attributes = makeAttributes(~ty, ~constraints, "Match")
       {attributes, children, name: "match"}
     }
     | Pair(first, second, ty) => {
       let first = exprToRawNodeDatum(first, constraints)
       let second = exprToRawNodeDatum(second, constraints)
       {
-        attributes: makeAttributes(~ty, ~constraints, "pair"),
+        attributes: makeAttributes(~ty, ~constraints, "Pair"),
         children: [first, second],
         name: "pair"
       }
     }
     | Name(name, ty) => {
-      attributes: makeAttributes(~ty, ~constraints, "name"),
+      attributes: makeAttributes(~ty, ~constraints, ~mainValueName="name", "Name"),
       children: [],
       name: name.lexeme
     }
@@ -157,7 +164,7 @@ and exprToRawNodeDatum = (e: AST.expr<Type.typeType>, constraints: Type.constrai
       let ifTrue = exprToRawNodeDatum(ifTrue, constraints)
       let ifFalse = exprToRawNodeDatum(ifFalse, constraints)
       {
-        attributes: makeAttributes(~ty, ~constraints, "if"),
+        attributes: makeAttributes(~ty, ~constraints, "If"),
         children: [test, ifTrue, ifFalse],
         name: "if"
       }
@@ -166,7 +173,7 @@ and exprToRawNodeDatum = (e: AST.expr<Type.typeType>, constraints: Type.constrai
       let left = exprToRawNodeDatum(left, constraints)
       let right = exprToRawNodeDatum(right, constraints)
       {
-        attributes: makeAttributes(~ty, ~constraints, "rel"),
+        attributes: makeAttributes(~ty, ~constraints, ~mainValueName="operator", "Rel"),
         children: [left, right],
         name: AST.relToFriendlyString(op)
       }
@@ -175,7 +182,7 @@ and exprToRawNodeDatum = (e: AST.expr<Type.typeType>, constraints: Type.constrai
       let fun = exprToRawNodeDatum(fun, constraints)
       let arg = exprToRawNodeDatum(arg, constraints)
       {
-        attributes: makeAttributes(~ty, ~constraints, "app"),
+        attributes: makeAttributes(~ty, ~constraints, "Application"),
         children: [fun, arg],
         name: "function application"
       }
@@ -184,7 +191,7 @@ and exprToRawNodeDatum = (e: AST.expr<Type.typeType>, constraints: Type.constrai
       let head = exprToRawNodeDatum(head, constraints)
       let tail = exprToRawNodeDatum(tail, constraints)
       {
-        attributes: makeAttributes(~ty, ~constraints, "cons"),
+        attributes: makeAttributes(~ty, ~constraints, "Cons"),
         children: [head, tail],
         name: "::"
       }
@@ -199,7 +206,7 @@ let astToRawNodeDatum = (ast: AST.ast<Type.typeType>, constraints: Type.constrai
     | Let(name, isRec, params, body, ty) => {
       let children = params->Js.Array2.map(tokenToRawNodeDatum)
       children->Js.Array2.push(exprToRawNodeDatum(body, constraints))->ignore
-      let attributes = makeAttributes(~ty, ~constraints, ~others=Js.Dict.fromArray([("rec", Tree.boolToAttributeValue(isRec))]), "let")
+      let attributes = makeAttributes(~ty, ~constraints, ~mainValueName="name", ~others=Js.Dict.fromArray([("rec", Tree.boolToAttributeValue(isRec))]), "Let")
       {attributes, children, name: name.lexeme}
     }
   }
@@ -215,11 +222,19 @@ module Node = {
   @react.component
   let make = (~nodeDatum: Tree.rawNodeDatum) => {
     open ReactDOM
+    open Tree
+
     let nodeType = nodeDatum.attributes->Js.Dict.get("nodeType")
     let nodeTypeDisplay = switch nodeType {
-      | Some(nodeType) => <>{nodeType->Tree.attributeValueToReactElement}<br /></>
+      | Some(nodeType) => <>{nodeType->attributeValueToReactElement}<br /></>
       | None => React.null
     }
+
+    let mainValue = switch nodeDatum.attributes->Js.Dict.get("mainValueName") {
+      | Some(mainValueName) => <>{mainValueName->attributeValueToReactElement}{" = "->React.string}{nodeDatum.name->Js.Json.serializeExn->React.string}</>
+      | None => React.null
+    }
+
     let textContainer = React.useRef(Js.Nullable.null)
     let (height, setHeight) = React.useState(_ => 60.0)
     let heightString = height->Belt.Float.toString
@@ -242,7 +257,7 @@ module Node = {
         <div xmlns="http://www.w3.org/1999/xhtml" style=divStyle>
           <div className="text" ref=ReactDOM.Ref.domRef(textContainer)>
             nodeTypeDisplay
-            {nodeDatum.name->React.string}
+            mainValue
           </div>
         </div>
       </foreignObject>
