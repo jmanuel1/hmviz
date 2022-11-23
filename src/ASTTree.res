@@ -8,6 +8,8 @@ module Tree = {
   external boolToAttributeValue: bool => attributeValue = "%identity"
   external stringToAttributeValue: string => attributeValue = "%identity"
 
+  external attributeValueToReactElement: attributeValue => React.element = "%identity"
+
   type attributeDict = Js.Dict.t<attributeValue>
 
   type rec rawNodeDatum = {
@@ -204,20 +206,48 @@ let astToRawNodeDatum = (ast: AST.ast<Type.typeType>, constraints: Type.constrai
 }
 
 @send external getBoundingClientRect: Dom.element => Dom.domRect = "getBoundingClientRect"
-@bs.get external get_width: Dom.domRect => int = "width"
-@bs.get external get_height: Dom.domRect => int = "height"
+@send external querySelector: (Dom.element, string) => Js.null<Dom.element> = "querySelector"
+@bs.get external get_width: Dom.domRect => float = "width"
+@bs.get external get_height: Dom.domRect => float = "height"
+@send external setAttributeNS: (Dom.element, Js.null<string>, string, string) => () = "setAttributeNS"
 
-let renderNode: Tree.renderCustomNodeElementFn = ({nodeDatum, hierarchyPointNode}) => {
-  open ReactDOM
-  let divStyle = Style.make(~display="flex", ~alignItems="unsafe center", ~justifyContent="unsafe center", ~textAlign="center", ~height="60px", ~width="120px", ~overflow="visible", ~overflowWrap="break-word", ())
-  <g transform="translate(-60, -30)" width="120" height="60" style=Style.make(~overflow="visible", ())>
-    <rect width="120" height="60" fill="#fff" />
-    <foreignObject width="120" height="60" style=Style.make(~overflow="visible", ())>
-      <div xmlns="http://www.w3.org/1999/xhtml" style=divStyle>
-        <div style=Style.make(~margin="auto", ~width="120px", ())>{nodeDatum.name->React.string}</div>
-      </div>
-    </foreignObject>
-  </g>
+module Node = {
+  @react.component
+  let make = (~nodeDatum: Tree.rawNodeDatum) => {
+    open ReactDOM
+    let nodeType = nodeDatum.attributes->Js.Dict.get("nodeType")
+    let nodeTypeDisplay = switch nodeType {
+      | Some(nodeType) => <>{nodeType->Tree.attributeValueToReactElement}<br /></>
+      | None => React.null
+    }
+    let textContainer = React.useRef(Js.Nullable.null)
+    let (height, setHeight) = React.useState(_ => 60.0)
+    let heightString = height->Belt.Float.toString
+    let heightPx = height->Belt.Float.toString ++ "px"
+    let translation = `translate(-60, -${(height/.2.0)->Belt.Float.toString})`
+
+    React.useEffect1(() => {
+      textContainer.current->Js.Nullable.toOption->Belt.Option.map((dom: Dom.element) => {
+        let rect: Dom.domRect = dom->getBoundingClientRect
+        let h = rect->get_height
+        setHeight(originalHeight => Js.Math.max_float(originalHeight, h))
+      })->ignore
+      None
+    }, [textContainer.current])
+
+    let divStyle = Style.make(~display="flex", ~alignItems="unsafe center", ~justifyContent="unsafe center", ~textAlign="center", ~height=heightPx, ~width="120px", ~overflow="visible", ~overflowWrap="break-word", ())
+    <g transform=translation width="120" height=heightString style=Style.make(~overflow="visible", ())>
+      <rect width="120" height=heightString fill="#fff" />
+      <foreignObject width="120" height=heightString style=Style.make(~overflow="visible", ())>
+        <div xmlns="http://www.w3.org/1999/xhtml" style=divStyle>
+          <div style=Style.make(~padding="8px", ~width="120px", ()) ref={ReactDOM.Ref.domRef(textContainer)}>
+            nodeTypeDisplay
+            {nodeDatum.name->React.string}
+          </div>
+        </div>
+      </foreignObject>
+    </g>
+  }
 }
 
 @react.component
@@ -235,6 +265,6 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   }, [container.current])
 
   <div id="ast" ref={ReactDOM.Ref.domRef(container)}>
-    <Tree data=astToRawNodeDatum(ast, constraints) orientation=#vertical dimensions renderCustomNodeElement=renderNode />
+    <Tree data=astToRawNodeDatum(ast, constraints) orientation=#vertical dimensions renderCustomNodeElement=(({nodeDatum}) => <Node nodeDatum />) />
   </div>
 }
