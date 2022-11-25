@@ -34,7 +34,15 @@ module Tree = {
 
   type dimensions = {height: float, width: float}
 
+  type treeLinkDatum = {
+    source: {"x": float, "y": float},
+    target: {"x": float, "y": float}
+  }
+
+  type pathFunction = (treeLinkDatum, orientation) => string
   type pathFunctionOption = [ #diagonal | #elbow | #straight | #step ]
+
+  type pathClassFunction = pathFunction
 
   type customNodeElementProps = {
     nodeDatum: rawNodeDatum,
@@ -51,6 +59,7 @@ module Tree = {
     ~onUpdate: onUpdate=?,
     ~zoom: float=?,
     ~dimensions: dimensions=?,
+    ~pathClassFunc: pathClassFunction=?,
     ~pathFunc: pathFunctionOption=?, // react-de-tree PathFunctionOption | PathFunction
     ~renderCustomNodeElement: renderCustomNodeElementFn=?
   ) => React.element = "default"
@@ -265,11 +274,36 @@ module Node = {
   }
 }
 
+module LinkCmp = Belt.Id.MakeComparable({
+  type t = Tree.treeLinkDatum
+  let cmp = (a: t, b: t) => {
+    Pervasives.compare(
+      (a.source["x"], a.source["y"], a.target["x"], a.target["y"]),
+      (b.source["x"], b.source["y"], b.target["x"], b.target["y"])
+    )
+  }
+})
+
+module Labels = {
+  @react.component
+  let make = (~wrapper: Dom.element, ~links: Belt.Set.Dict.t<Tree.treeLinkDatum, LinkCmp.identity>) => {
+    let labels = links->Belt.Set.Dict.toArray->Belt.Array.map(({source, target}) => {
+      let x = ((source["x"] +. target["x"])/.2.0)->Belt.Float.toString
+      let y = ((source["y"] +. target["y"])/.2.0)->Belt.Float.toString
+      <text x y className="label" key=`label-${x}-${y}`>{"Blah"->React.string}</text>
+    })
+
+    ReactDOM.createPortal(labels->React.array, wrapper)
+  }
+}
+
 @react.component
 let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   open Tree
   let container = React.useRef(Js.Nullable.null)
   let (dimensions, setDimensions) = React.useState(_ => {height: 0.0, width: 0.0})
+  let links = React.useRef(Belt.Set.Dict.empty)
+  let labels = React.useRef([])
 
   React.useEffect1(() => {
     container.current->Js.Nullable.toOption->Belt.Option.map((dom: Dom.element) => {
@@ -283,7 +317,37 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
     None
   }, [container.current])
 
+  let drawLabel = React.useCallback1(({source, target}: treeLinkDatum) => {
+    let x = ((source["x"] +. target["x"])/.2.0)->Belt.Float.toString
+    let y = ((source["y"] +. target["y"])/.2.0)->Belt.Float.toString
+    labels.current = labels.current->Js.Array2.concat([
+      <text x y className="label">{"Blah"->React.string}</text>
+    ])
+  }, [labels.current])
+
+  React.useEffect2(() => {
+    Some(() => {
+      links.current = Belt.Set.Dict.empty
+    })
+  }, (ast, constraints))
+
   <div id="ast" ref={ReactDOM.Ref.domRef(container)}>
-    <Tree data=astToRawNodeDatum(ast, constraints) orientation=#vertical dimensions renderCustomNodeElement=(({nodeDatum}) => <Node nodeDatum />) />
+    <Tree
+      data=astToRawNodeDatum(ast, constraints)
+      dimensions
+      orientation=#vertical
+      pathClassFunc={(link, _) => {
+        links.current = links.current->Belt.Set.Dict.add(link, ~cmp=LinkCmp.cmp)
+        ".rd3t-link"
+      }}
+      renderCustomNodeElement=(({nodeDatum}) => <Node nodeDatum />)
+    />
+    {switch container.current->Js.Nullable.toOption {
+      | Some(dom) => {
+        let svgWrapperElement = dom->querySelector("g")->Js.Null.getExn
+        <Labels wrapper=svgWrapperElement links=links.current />
+      }
+      | None => React.null
+    }}
   </div>
 }

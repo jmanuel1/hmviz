@@ -29,3 +29,7 @@
 .rd3t-node .text, .rd3t-leaf-node .text {
   padding: 8px;
 }
+
+.label {
+  text-anchor: middle;
+}
