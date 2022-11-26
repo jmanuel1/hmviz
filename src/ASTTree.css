@@ -33,3 +33,7 @@
 .label {
   text-anchor: middle;
 }
+
+.label-background {
+  fill: #fff;
+}

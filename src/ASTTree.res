@@ -226,6 +226,14 @@ let astToRawNodeDatum = (ast: AST.ast<Type.typeType>, constraints: Type.constrai
 @bs.get external get_width: Dom.domRect => float = "width"
 @bs.get external get_height: Dom.domRect => float = "height"
 @send external setAttributeNS: (Dom.element, Js.null<string>, string, string) => () = "setAttributeNS"
+@send external getBBox: Dom.element => Dom.svgRect = "getBBox"
+
+module SVGRect = {
+  @get external x: Dom.svgRect => float = "x"
+  @get external y: Dom.svgRect => float = "y"
+  @get external width: Dom.svgRect => float = "width"
+  @get external height: Dom.svgRect => float = "height"
+}
 
 module Node = {
   @react.component
@@ -284,13 +292,49 @@ module LinkCmp = Belt.Id.MakeComparable({
   }
 })
 
+module Label = {
+  @react.component
+  let make = (~x: float, ~y: float) => {
+    open Belt.Float
+
+    let labelRef = React.useRef(Js.Nullable.null)
+    let (rect, setRect) = React.useState(_ => None)
+
+    React.useEffect1(() => {
+      labelRef.current->Js.Nullable.iter((. label) => {
+        let rect = label->getBBox
+        setRect(_ => Some(rect))
+      })
+      None
+    }, [labelRef.current])
+
+    let background = switch rect {
+      | Some(rect) => {
+        let backgroundX = rect->SVGRect.x
+        let backgroundY = rect->SVGRect.y
+        let width = rect->SVGRect.width
+        let height = rect->SVGRect.height
+        <rect x={backgroundX->toString} y={backgroundY->toString} width={width->toString} height={height->toString} className="label-background"/>
+      }
+      | None => React.null
+    }
+
+    <>
+      background
+      <text x={x->toString} y={y->toString} className="label" ref=ReactDOM.Ref.domRef(labelRef)>{"Blah"->React.string}</text>
+    </>
+  }
+}
+
 module Labels = {
   @react.component
   let make = (~wrapper: Dom.element, ~links: Belt.Set.Dict.t<Tree.treeLinkDatum, LinkCmp.identity>) => {
+    open Belt.Float
+
     let labels = links->Belt.Set.Dict.toArray->Belt.Array.map(({source, target}) => {
-      let x = ((source["x"] +. target["x"])/.2.0)->Belt.Float.toString
-      let y = ((source["y"] +. target["y"])/.2.0)->Belt.Float.toString
-      <text x y className="label" key=`label-${x}-${y}`>{"Blah"->React.string}</text>
+      let x = (source["x"] +. target["x"])/.2.0
+      let y = (source["y"] +. target["y"])/.2.0
+      <Label x y key=`label-${x->toString}-${y->toString}` />
     })
 
     ReactDOM.createPortal(labels->React.array, wrapper)
@@ -303,7 +347,6 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   let container = React.useRef(Js.Nullable.null)
   let (dimensions, setDimensions) = React.useState(_ => {height: 0.0, width: 0.0})
   let links = React.useRef(Belt.Set.Dict.empty)
-  let labels = React.useRef([])
 
   React.useEffect1(() => {
     container.current->Js.Nullable.toOption->Belt.Option.map((dom: Dom.element) => {
@@ -316,14 +359,6 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
     })->ignore
     None
   }, [container.current])
-
-  let drawLabel = React.useCallback1(({source, target}: treeLinkDatum) => {
-    let x = ((source["x"] +. target["x"])/.2.0)->Belt.Float.toString
-    let y = ((source["y"] +. target["y"])/.2.0)->Belt.Float.toString
-    labels.current = labels.current->Js.Array2.concat([
-      <text x y className="label">{"Blah"->React.string}</text>
-    ])
-  }, [labels.current])
 
   React.useEffect2(() => {
     Some(() => {
