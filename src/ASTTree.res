@@ -221,11 +221,7 @@ let astToRawNodeDatum = (ast: AST.ast<Type.typeType>, constraints: Type.constrai
   }
 }
 
-@send external getBoundingClientRect: Dom.element => Dom.domRect = "getBoundingClientRect"
-@send external querySelector: (Dom.element, string) => Js.null<Dom.element> = "querySelector"
-@bs.get external get_width: Dom.domRect => float = "width"
-@bs.get external get_height: Dom.domRect => float = "height"
-@send external setAttributeNS: (Dom.element, Js.null<string>, string, string) => () = "setAttributeNS"
+// Bindings I couldn't find in Webapi
 @send external getBBox: Dom.element => Dom.svgRect = "getBBox"
 
 module SVGRect = {
@@ -240,6 +236,8 @@ module Node = {
   let make = (~nodeDatum: Tree.rawNodeDatum) => {
     open ReactDOM
     open Tree
+    open Webapi.Dom
+    open Webapi.Dom.Element
 
     let nodeType = nodeDatum.attributes->Js.Dict.get("nodeType")
     let nodeTypeDisplay = switch nodeType {
@@ -261,7 +259,7 @@ module Node = {
     React.useEffect1(() => {
       textContainer.current->Js.Nullable.toOption->Belt.Option.map((dom: Dom.element) => {
         let rect: Dom.domRect = dom->getBoundingClientRect
-        let h = rect->get_height
+        let h = rect->DomRect.height
         setHeight(originalHeight => Js.Math.max_float(originalHeight, h))
       })->ignore
       None
@@ -344,6 +342,9 @@ module Labels = {
 @react.component
 let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   open Tree
+  open Webapi.Dom.DomRect
+  open Webapi.Dom.Element
+
   let container = React.useRef(Js.Nullable.null)
   let (dimensions, setDimensions) = React.useState(_ => {height: 0.0, width: 0.0})
   let links = React.useRef(Belt.Set.Dict.empty)
@@ -351,11 +352,11 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   React.useEffect1(() => {
     container.current->Js.Nullable.toOption->Belt.Option.map((dom: Dom.element) => {
       let rect: Dom.domRect = dom->getBoundingClientRect
-      let treeRect = dom->querySelector("g")->Js.Null.getExn->getBoundingClientRect
+      let treeRect = dom->querySelector("g")->Belt.Option.getExn->getBoundingClientRect
       // Center the tree rect.
-      setDimensions(_ => {height: rect->get_height, width: rect->get_width})
-      let svg = dom->querySelector("svg")->Js.Null.getExn
-      svg->setAttributeNS(Js.Null.empty, "viewBox", `${-.(treeRect->get_width/.2.0)->Js.Float.toString} 0 ${treeRect->get_width->Js.Float.toString} ${treeRect->get_height->Js.Float.toString}`)
+      setDimensions(_ => {height: rect->height, width: rect->width})
+      let svg = dom->querySelector("svg")->Belt.Option.getExn
+      svg->setAttributeNS("", "viewBox", `${-.(treeRect->width/.2.0)->Js.Float.toString} 0 ${treeRect->width->Js.Float.toString} ${treeRect->height->Js.Float.toString}`)
     })->ignore
     None
   }, [container.current])
@@ -379,7 +380,7 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
     />
     {switch container.current->Js.Nullable.toOption {
       | Some(dom) => {
-        let svgWrapperElement = dom->querySelector("g")->Js.Null.getExn
+        let svgWrapperElement = dom->querySelector("g")->Js.Option.getExn
         <Labels wrapper=svgWrapperElement links=links.current />
       }
       | None => React.null
