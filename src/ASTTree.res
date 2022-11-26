@@ -1,6 +1,8 @@
 %%raw(`import './ASTTree.css';`)
 
 module Tree = {
+  open D3.Hierarchy
+
   type attributeValue
 
   external intToAttributeValue: int => attributeValue = "%identity"
@@ -35,8 +37,8 @@ module Tree = {
   type dimensions = {height: float, width: float}
 
   type treeLinkDatum = {
-    source: {"x": float, "y": float},
-    target: {"x": float, "y": float}
+    source: pointNode<rawNodeDatum>,
+    target: pointNode<rawNodeDatum>
   }
 
   type pathFunction = (treeLinkDatum, orientation) => string
@@ -90,6 +92,10 @@ let makeAttributes = (~ty: option<Type.typeType>=?, ~constraints: Type.constrain
   }
 
   others
+}
+
+let setInEdgeLabel = (attributes: Tree.attributeDict, label: string) => {
+  attributes->Js.Dict.set("inEdgeLabel", label->Tree.stringToAttributeValue)
 }
 
 let rec patternToRawNodeDatum = (pat: AST.pattern): Tree.rawNodeDatum => {
@@ -149,6 +155,7 @@ and exprToRawNodeDatum = (e: AST.expr<Type.typeType>, constraints: Type.constrai
   switch e {
     | Match(scrutinee, clauses, ty) => {
       let scrutinee = exprToRawNodeDatum(scrutinee, constraints)
+      scrutinee.attributes->setInEdgeLabel("scrutinee")
       let children = clauses->Js.Array2.map(c => clauseToRawNodeDatum(c, constraints))
       children->Js.Array2.unshift(scrutinee)->ignore
       let attributes = makeAttributes(~ty, ~constraints, "Match")
@@ -170,8 +177,11 @@ and exprToRawNodeDatum = (e: AST.expr<Type.typeType>, constraints: Type.constrai
     }
     | If(test, ifTrue, ifFalse, ty) => {
       let test = exprToRawNodeDatum(test, constraints)
+      test.attributes->setInEdgeLabel("test")
       let ifTrue = exprToRawNodeDatum(ifTrue, constraints)
+      ifTrue.attributes->setInEdgeLabel("true branch")
       let ifFalse = exprToRawNodeDatum(ifFalse, constraints)
+      ifFalse.attributes->setInEdgeLabel("false branch")
       {
         attributes: makeAttributes(~ty, ~constraints, "If"),
         children: [test, ifTrue, ifFalse],
@@ -213,9 +223,15 @@ let astToRawNodeDatum = (ast: AST.ast<Type.typeType>, constraints: Type.constrai
 
   switch ast {
     | Let(name, isRec, params, body, ty) => {
-      let children = params->Js.Array2.map(tokenToRawNodeDatum)
-      children->Js.Array2.push(exprToRawNodeDatum(body, constraints))->ignore
-      let attributes = makeAttributes(~ty, ~constraints, ~mainValueName="name", ~others=Js.Dict.fromArray([("rec", Tree.boolToAttributeValue(isRec))]), "Let")
+      let params = params->Js.Array2.map(tokenToRawNodeDatum)
+      params->Js.Array2.forEach(param =>
+        param.attributes->setInEdgeLabel("param")
+      )
+      let body = exprToRawNodeDatum(body, constraints)
+      body.attributes->setInEdgeLabel("body")
+      let children = params
+      children->Js.Array2.push(body)->ignore
+      let attributes = makeAttributes(~ty, ~constraints, ~mainValueName="name", ~others=Js.Dict.fromArray([("isRec", Tree.boolToAttributeValue(isRec))]), "Let")
       {attributes, children, name: name.lexeme}
     }
   }
@@ -284,15 +300,15 @@ module LinkCmp = Belt.Id.MakeComparable({
   type t = Tree.treeLinkDatum
   let cmp = (a: t, b: t) => {
     Pervasives.compare(
-      (a.source["x"], a.source["y"], a.target["x"], a.target["y"]),
-      (b.source["x"], b.source["y"], b.target["x"], b.target["y"])
+      (a.source.x, a.source.y, a.target.x, a.target.y),
+      (b.source.x, b.source.y, b.target.x, b.target.y)
     )
   }
 })
 
 module Label = {
   @react.component
-  let make = (~x: float, ~y: float) => {
+  let make = (~x: float, ~y: float, ~label: Tree.attributeValue) => {
     open Belt.Float
 
     let labelRef = React.useRef(Js.Nullable.null)
@@ -312,14 +328,14 @@ module Label = {
         let backgroundY = rect->SVGRect.y
         let width = rect->SVGRect.width
         let height = rect->SVGRect.height
-        <rect x={backgroundX->toString} y={backgroundY->toString} width={width->toString} height={height->toString} className="label-background"/>
+        <rect x={backgroundX->toString} y={backgroundY->toString} width={width->toString} height={height->toString} className="label-background" />
       }
       | None => React.null
     }
 
     <>
       background
-      <text x={x->toString} y={y->toString} className="label" ref=ReactDOM.Ref.domRef(labelRef)>{"Blah"->React.string}</text>
+      <text x={x->toString} y={y->toString} className="label" ref=ReactDOM.Ref.domRef(labelRef)>{label->Tree.attributeValueToReactElement}</text>
     </>
   }
 }
@@ -329,10 +345,13 @@ module Labels = {
   let make = (~wrapper: Dom.element, ~links: Belt.Set.Dict.t<Tree.treeLinkDatum, LinkCmp.identity>) => {
     open Belt.Float
 
-    let labels = links->Belt.Set.Dict.toArray->Belt.Array.map(({source, target}) => {
-      let x = (source["x"] +. target["x"])/.2.0
-      let y = (source["y"] +. target["y"])/.2.0
-      <Label x y key=`label-${x->toString}-${y->toString}` />
+    let labels = links->Belt.Set.Dict.toArray->Js.Array2.filter(({target}) => {
+      target.data.attributes->Js.Dict.get("inEdgeLabel")->Js.Option.isSome
+    })->Js.Array2.map(({source, target}) => {
+      let x = (source.x +. target.x)/.2.0
+      let y = (source.y +. target.y)/.2.0
+      let label = target.data.attributes->Js.Dict.unsafeGet("inEdgeLabel")
+      <Label x y label key=`label-${x->toString}-${y->toString}` />
     })
 
     ReactDOM.createPortal(labels->React.array, wrapper)

@@ -20,6 +20,7 @@
   "suffix": ".bs.js",
   "namespace": true,
   "bs-dependencies": [
+    "rescript-d3",
     "@rescript/react",
     "rescript-webapi"
   ],
