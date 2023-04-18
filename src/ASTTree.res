@@ -24,6 +24,7 @@ module Tree = {
     x: float,
     y: float
   }
+  type size = translation
 
   type orientation = [ #horizontal | #vertical ]
 
@@ -41,7 +42,7 @@ module Tree = {
     target: pointNode<rawNodeDatum>
   }
 
-  type pathFunction = (treeLinkDatum, orientation) => string
+  type pathFunction = (. treeLinkDatum, orientation) => string
   type pathFunctionOption = [ #diagonal | #elbow | #straight | #step ]
 
   type pathClassFunction = pathFunction
@@ -63,7 +64,8 @@ module Tree = {
     ~dimensions: dimensions=?,
     ~pathClassFunc: pathClassFunction=?,
     ~pathFunc: pathFunctionOption=?, // react-de-tree PathFunctionOption | PathFunction
-    ~renderCustomNodeElement: renderCustomNodeElementFn=?
+    ~renderCustomNodeElement: renderCustomNodeElementFn=?,
+    ~nodeSize: size=?
   ) => React.element = "default"
 }
 
@@ -249,7 +251,7 @@ module SVGRect = {
 
 module Node = {
   @react.component
-  let make = (~nodeDatum: Tree.rawNodeDatum) => {
+  let make = (~nodeDatum: Tree.rawNodeDatum, ~nodeSizeCallback: (option<Tree.size> => option<Tree.size>) => ()) => {
     open ReactDOM
     open Tree
     open Webapi.Dom
@@ -266,6 +268,11 @@ module Node = {
       | None => React.null
     }
 
+    let isRec = switch nodeDatum.attributes->Js.Dict.get("isRec") {
+      | Some(_) if nodeDatum.attributes->Js.Dict.unsafeGet("nodeType") == "Let"->stringToAttributeValue => <>{" (recursive) "->React.string}<br /></>
+      | _ => React.null
+    }
+
     let textContainer = React.useRef(Js.Nullable.null)
     let (height, setHeight) = React.useState(_ => 60.0)
     let heightString = height->Belt.Float.toString
@@ -277,6 +284,11 @@ module Node = {
         let rect: Dom.domRect = dom->getBoundingClientRect
         let h = rect->DomRect.height
         setHeight(originalHeight => Js.Math.max_float(originalHeight, h))
+        nodeSizeCallback(nodeSize => switch nodeSize {
+          | Some(nodeSize) if nodeSize.y < h => Some({x: 120.0, y: h})
+          | None => Some({x: 120.0, y: h})
+          | _ => nodeSize
+        })
       })->ignore
       None
     }, [textContainer.current])
@@ -288,6 +300,7 @@ module Node = {
         <div xmlns="http://www.w3.org/1999/xhtml" style=divStyle>
           <div className="text" ref=ReactDOM.Ref.domRef(textContainer)>
             nodeTypeDisplay
+            isRec
             mainValue
           </div>
         </div>
@@ -367,6 +380,14 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   let container = React.useRef(Js.Nullable.null)
   let (dimensions, setDimensions) = React.useState(_ => {height: 0.0, width: 0.0})
   let links = React.useRef(Belt.Set.Dict.empty)
+  let (_, setDummyState) = React.useState(_ => Js.Obj.empty())
+  let (nodeSize, setNodeSize) = React.useState(_ => None)
+  let treeData = React.useMemo2(() => astToRawNodeDatum(ast, constraints), (ast, constraints))
+  let linkCallback = React.useMemo(() => (. link, _) => {
+    links.current = links.current->Belt.Set.Dict.add(link, ~cmp=LinkCmp.cmp)
+    // setDummyState(_ => Js.Obj.empty())
+    ""
+  })
 
   React.useEffect1(() => {
     container.current->Js.Nullable.toOption->Belt.Option.map((dom: Dom.element) => {
@@ -380,22 +401,21 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
     None
   }, [container.current])
 
-  React.useEffect2(() => {
+  React.useEffect3(() => {
     Some(() => {
       links.current = Belt.Set.Dict.empty
+      // setDummyState(_ => Js.Obj.empty())
     })
-  }, (ast, constraints))
+  }, (ast, constraints, nodeSize->Js.Option.isSome))
 
   <div id="ast" ref={ReactDOM.Ref.domRef(container)}>
     <Tree
-      data=astToRawNodeDatum(ast, constraints)
+      data=treeData
       dimensions
       orientation=#vertical
-      pathClassFunc={(link, _) => {
-        links.current = links.current->Belt.Set.Dict.add(link, ~cmp=LinkCmp.cmp)
-        ".rd3t-link"
-      }}
-      renderCustomNodeElement=(({nodeDatum}) => <Node nodeDatum />)
+      pathClassFunc={linkCallback}
+      nodeSize=?nodeSize
+      renderCustomNodeElement=React.useCallback0(({nodeDatum}) => <Node nodeDatum nodeSizeCallback=setNodeSize />)
     />
     {switch container.current->Js.Nullable.toOption {
       | Some(dom) => {
