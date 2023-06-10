@@ -373,56 +373,24 @@ module Labels = {
 
 @react.component
 let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
+  open GraphvizReact
   open Tree
   open Webapi.Dom.DomRect
   open Webapi.Dom.Element
 
-  let container = React.useRef(Js.Nullable.null)
-  let (dimensions, setDimensions) = React.useState(_ => {height: 0.0, width: 0.0})
-  let links = React.useRef(Belt.Set.Dict.empty)
-  let (_, setDummyState) = React.useState(_ => Js.Obj.empty())
-  let (nodeSize, setNodeSize) = React.useState(_ => None)
-  let treeData = React.useMemo2(() => astToRawNodeDatum(ast, constraints), (ast, constraints))
-  let linkCallback = React.useMemo(() => (. link, _) => {
-    links.current = links.current->Belt.Set.Dict.add(link, ~cmp=LinkCmp.cmp)
-    // setDummyState(_ => Js.Obj.empty())
-    ""
-  })
+  let dot = `digraph D {
 
-  React.useEffect1(() => {
-    container.current->Js.Nullable.toOption->Belt.Option.map((dom: Dom.element) => {
-      let rect: Dom.domRect = dom->getBoundingClientRect
-      let treeRect = dom->querySelector("g")->Belt.Option.getExn->getBoundingClientRect
-      // Center the tree rect.
-      setDimensions(_ => {height: rect->height, width: rect->width})
-      let svg = dom->querySelector("svg")->Belt.Option.getExn
-      svg->setAttributeNS("", "viewBox", `${-.(treeRect->width/.2.0)->Js.Float.toString} 0 ${treeRect->width->Js.Float.toString} ${treeRect->height->Js.Float.toString}`)
-    })->ignore
-    None
-  }, [container.current])
+    A [shape=diamond]
+    B [shape=box]
+    C [shape=circle]
 
-  React.useEffect3(() => {
-    Some(() => {
-      links.current = Belt.Set.Dict.empty
-      // setDummyState(_ => Js.Obj.empty())
-    })
-  }, (ast, constraints, nodeSize->Js.Option.isSome))
+    A -> B [style=dashed, color=grey]
+    A -> C [color="black:invis:black"]
+    A -> D [penwidth=5, arrowhead=none]
 
-  <div id="ast" ref={ReactDOM.Ref.domRef(container)}>
-    <Tree
-      data=treeData
-      dimensions
-      orientation=#vertical
-      pathClassFunc={linkCallback}
-      nodeSize=?nodeSize
-      renderCustomNodeElement=React.useCallback0(({nodeDatum}) => <Node nodeDatum nodeSizeCallback=setNodeSize />)
-    />
-    {switch container.current->Js.Nullable.toOption {
-      | Some(dom) => {
-        let svgWrapperElement = dom->querySelector("g")->Js.Option.getExn
-        <Labels wrapper=svgWrapperElement links=links.current />
-      }
-      | None => React.null
-    }}
+  }`
+
+  <div id="ast">
+    <GraphvizReact dot />
   </div>
 }
