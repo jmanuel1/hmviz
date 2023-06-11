@@ -5400,10 +5400,10 @@ graceful-fs@^4.1.11, graceful-fs@^4.1.15, graceful-fs@^4.1.2, graceful-fs@^4.1.6
   resolved "https://registry.yarnpkg.com/graceful-fs/-/graceful-fs-4.2.10.tgz#147d3a006da4ca3ce14728c7aefc287c367d7a6c"
   integrity sha512-9ByhssR2fPVsNZj478qUUbKfmL0+t5BDVyjShtyZZLiK7ZDAArFFfopyOTj0M05wE2tJPisA4iTnnXl2YoPvOA==
 
-graphviz-builder@^0.1.1:
-  version "0.1.1"
-  resolved "https://registry.yarnpkg.com/graphviz-builder/-/graphviz-builder-0.1.1.tgz#27aa48e51ef380702ceb197ad644e474d3e9fc43"
-  integrity sha512-4pzfUc6v6DiWk/e7arrzxAn6UTb03XgN30sd1YKiYgUUwR00ZH+fU9ZZy4yh+jkNh9iZjRwlaX/C6/U2wPTEUA==
+graphviz-builder@0.1.0:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/graphviz-builder/-/graphviz-builder-0.1.0.tgz#4ea81c1faa52cebd4f7c4bc7bba1e07dca04e866"
+  integrity sha512-fHGK8+V4qo9IXDVMxW0Af1PiEeotIhQkc87iCiQgID9MVHeyjIdgiSzlKNDKcTVXZywSc38PJXQJkwFgycp8QQ==
 
 graphviz-react@^1.2.5:
   version "1.2.5"

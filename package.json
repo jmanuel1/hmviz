@@ -8,7 +8,7 @@
     "@testing-library/user-event": "^12.8.3",
     "bs-platform": "^8.4.2",
     "bs-react-testing-library": "^0.8.0",
-    "graphviz-builder": "^0.1.1",
+    "graphviz-builder": "0.1.0",
     "graphviz-react": "^1.2.5",
     "npm-run-all": "^4.1.5",
     "react": "^16.8.1",
