@@ -1,394 +1,163 @@
 %%raw(`import './ASTTree.css';`)
 
-module Tree = {
-  open D3.Hierarchy
+open GraphvizBuilder
 
-  type attributeValue
+let nextID : ref<int> = ref(0)
 
-  external intToAttributeValue: int => attributeValue = "%identity"
-  external floatToAttributeValue: float => attributeValue = "%identity"
-  external boolToAttributeValue: bool => attributeValue = "%identity"
-  external stringToAttributeValue: string => attributeValue = "%identity"
-
-  external attributeValueToReactElement: attributeValue => React.element = "%identity"
-
-  type attributeDict = Js.Dict.t<attributeValue>
-
-  type rec rawNodeDatum = {
-    attributes: attributeDict,
-    children: array<rawNodeDatum>,
-    name: string
-  }
-
-  type translation = {
-    x: float,
-    y: float
-  }
-  type size = translation
-
-  type orientation = [ #horizontal | #vertical ]
-
-  type onUpdateTarget = {
-    node: Js.null<rawNodeDatum>, // supertype of react-d3-tree TreeNodeDatum
-    translate: translation, // react-d3-tree Point
-    zoom: float,
-  }
-  type onUpdate = onUpdateTarget => ()
-
-  type dimensions = {height: float, width: float}
-
-  type treeLinkDatum = {
-    source: pointNode<rawNodeDatum>,
-    target: pointNode<rawNodeDatum>
-  }
-
-  type pathFunction = (. treeLinkDatum, orientation) => string
-  type pathFunctionOption = [ #diagonal | #elbow | #straight | #step ]
-
-  type pathClassFunction = pathFunction
-
-  type customNodeElementProps = {
-    nodeDatum: rawNodeDatum,
-    hierarchyPointNode: {"x": float, "y": float}, // TODO: Get d3 bindings
-  }
-
-  type renderCustomNodeElementFn = customNodeElementProps => React.element
-
-  @bs.module("react-d3-tree") @react.component
-  external make: (
-    ~data: rawNodeDatum,
-    ~translate: translation=?,
-    ~orientation: orientation=?,
-    ~onUpdate: onUpdate=?,
-    ~zoom: float=?,
-    ~dimensions: dimensions=?,
-    ~pathClassFunc: pathClassFunction=?,
-    ~pathFunc: pathFunctionOption=?, // react-de-tree PathFunctionOption | PathFunction
-    ~renderCustomNodeElement: renderCustomNodeElementFn=?,
-    ~nodeSize: size=?
-  ) => React.element = "default"
+let freshID = () : string => {
+  let id = nextID.contents
+  nextID := nextID.contents + 1
+  id->Js.String2.make
 }
 
-let tokenToRawNodeDatum = (token: AST.token): Tree.rawNodeDatum => {
-  open Tree
-  {attributes: Js.Dict.fromArray([("nodeType", stringToAttributeValue(`${AST.tokenTypeToString(token.type_)} token`)), ("mainValueName", stringToAttributeValue("lexeme"))]), children: [], name: token.lexeme}
+let addUniqueNode = (graph: graph, label: string): Node.t => {
+  graph->addNodeWithAttributes(freshID(), Js.Dict.fromArray([("label", label)]))
 }
 
-let makeAttributes = (~ty: option<Type.typeType>=?, ~constraints: Type.constraints=Belt.Map.Int.empty, ~mainValueName: option<string>=?, ~others: Tree.attributeDict=Js.Dict.empty(), nodeType: string): Tree.attributeDict => {
-  open Tree
-  open Type
-
-  // Copy the dictionary so callers aren't surprised by mutation.
-  let others = others->Js.Dict.entries->Js.Dict.fromArray
-
-  others->Js.Dict.set("nodeType", stringToAttributeValue(nodeType))
-
-  switch ty {
-    | Some(ty) => others->Js.Dict.set("type", stringToAttributeValue(ty->substitute(constraints)->toFriendlyString))
-    | _ => ()
-  }
-
-  switch mainValueName {
-    | Some(mainValueName) => others->Js.Dict.set("mainValueName", stringToAttributeValue(mainValueName))
-    | _ => ()
-  }
-
-  others
+let addTokenNode = (graph: graph, token: AST.token): Node.t => {
+  let node = graph->addUniqueNode(`${AST.tokenTypeToString(token.type_)} token\n${token.lexeme}`)
+  node
 }
 
-let setInEdgeLabel = (attributes: Tree.attributeDict, label: string) => {
-  attributes->Js.Dict.set("inEdgeLabel", label->Tree.stringToAttributeValue)
+let addLabeledEdge = (graph: graph, source: Node.t, target: Node.t, label: string) => {
+  let edge = graph->addEdge(source, target)
+  edge->Edge.set("label", label)
+  edge
 }
 
-let rec patternToRawNodeDatum = (pat: AST.pattern): Tree.rawNodeDatum => {
+let rec addPatternNode = (graph: graph, pat: AST.pattern): Node.t => {
   switch pat {
     | PairPat(first, second) => {
-      let first = patternToRawNodeDatum(first)
-      let second = patternToRawNodeDatum(second)
-      {
-        attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("PairPattern"))]),
-        children: [first, second],
-        name: "(,)"
-      }
+      let first = addPatternNode(graph, first)
+      let second = addPatternNode(graph, second)
+      let node = graph->addUniqueNode("PairPattern\n(,)")
+      graph->addEdge(node, first)->ignore
+      graph->addEdge(node, second)->ignore
+      node
     }
     | ListPat(patterns) => {
-      let patterns = patterns->Js.Array2.map(patternToRawNodeDatum)
-      {
-        attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("ListPattern"))]),
-        children: patterns,
-        name: "[]"
-      }
+      let patterns = patterns->Js.Array2.map(addPatternNode(graph))
+      let node = graph->addUniqueNode("ListPattern\n[]")
+      patterns->Js.Array2.forEach(pat => graph->addEdge(node, pat)->ignore)
+      node
     }
     | Wildcard => {
-      attributes: makeAttributes("WildcardPattern"),
-      children: [],
-      name: "_"
+      graph->addUniqueNode("WildcardPattern\n_")
     }
     | ConsPat(head, tail) => {
-      let head = patternToRawNodeDatum(head)
-      let tail = patternToRawNodeDatum(tail)
-      {
-        attributes: makeAttributes("ConsPattern"),
-        children: [head, tail],
-        name: "::"
-      }
+      let head = graph->addPatternNode(head)
+      let tail = graph->addPatternNode(tail)
+      let node = graph->addUniqueNode("ConsPattern\n::")
+      graph->addEdge(node, head)->ignore
+      graph->addEdge(node, tail)->ignore
+      node
     }
     | NamePat(name) => {
-      {
-        attributes: makeAttributes(~mainValueName="name", "NamePattern"),
-        children: [],
-        name: name.lexeme
-      }
+      graph->addUniqueNode(`NamePattern\nname = ${name.lexeme}`)
     }
   }
 }
 
-let rec clauseToRawNodeDatum = (clause: AST.clause<Type.typeType>, constraints: Type.constraints): Tree.rawNodeDatum => {
-  let (pattern, body) = clause
-  let pattern = patternToRawNodeDatum(pattern)
-  let body = exprToRawNodeDatum(body, constraints)
-  {
-    attributes: Js.Dict.fromArray([("nodeType", Tree.stringToAttributeValue("Clause"))]),
-    children: [pattern, body],
-    name: "pattern matching clause"
-  }
+let addTypedNode = (graph: graph, id: string, ty: Type.typeType, constraints: Type.constraints): Node.t => {
+  open Type
+
+  graph->addUniqueNode(`${id}\ntype = ${ty->substitute(constraints)->toFriendlyString}`)
 }
-and exprToRawNodeDatum = (e: AST.expr<Type.typeType>, constraints: Type.constraints): Tree.rawNodeDatum => {
+
+let rec addClauseNode = (graph: graph, clause: AST.clause<Type.typeType>, constraints: Type.constraints): Node.t => {
+  let (pattern, body) = clause
+  let pattern = graph->addPatternNode(pattern)
+  let body = graph->addExprNode(body, constraints)
+  let node = graph->addUniqueNode("Clause\npattern matching clause")
+  graph->addEdge(node, pattern)->ignore
+  graph->addEdge(node, body)->ignore
+  node
+}
+and addExprNode = (graph: graph, e: AST.expr<Type.typeType>, constraints: Type.constraints): Node.t => {
+  open AST
+
   switch e {
     | Match(scrutinee, clauses, ty) => {
-      let scrutinee = exprToRawNodeDatum(scrutinee, constraints)
-      scrutinee.attributes->setInEdgeLabel("scrutinee")
-      let children = clauses->Js.Array2.map(c => clauseToRawNodeDatum(c, constraints))
-      children->Js.Array2.unshift(scrutinee)->ignore
-      let attributes = makeAttributes(~ty, ~constraints, "Match")
-      {attributes, children, name: "match"}
+      let node = graph->addTypedNode("Match", ty, constraints)
+      let scrutinee = graph->addExprNode(scrutinee, constraints)
+      graph->addLabeledEdge(node, scrutinee, "scrutinee")->ignore
+      let children = clauses->Js.Array2.map(c => graph->addClauseNode(c, constraints))
+      children->Js.Array2.forEach(clause => graph->addEdge(node, clause)->ignore)
+      node
     }
     | Pair(first, second, ty) => {
-      let first = exprToRawNodeDatum(first, constraints)
-      let second = exprToRawNodeDatum(second, constraints)
-      {
-        attributes: makeAttributes(~ty, ~constraints, "Pair"),
-        children: [first, second],
-        name: "pair"
-      }
+      let first = graph->addExprNode(first, constraints)
+      let second = graph->addExprNode(second, constraints)
+      let node = graph->addTypedNode("Pair", ty, constraints)
+      graph->addEdge(node, first)->ignore
+      graph->addEdge(node, second)->ignore
+      node
     }
     | Name(name, ty) => {
-      attributes: makeAttributes(~ty, ~constraints, ~mainValueName="name", "Name"),
-      children: [],
-      name: name.lexeme
+      graph->addTypedNode(`Name\n${name.lexeme}`, ty, constraints)
     }
     | If(test, ifTrue, ifFalse, ty) => {
-      let test = exprToRawNodeDatum(test, constraints)
-      test.attributes->setInEdgeLabel("test")
-      let ifTrue = exprToRawNodeDatum(ifTrue, constraints)
-      ifTrue.attributes->setInEdgeLabel("true branch")
-      let ifFalse = exprToRawNodeDatum(ifFalse, constraints)
-      ifFalse.attributes->setInEdgeLabel("false branch")
-      {
-        attributes: makeAttributes(~ty, ~constraints, "If"),
-        children: [test, ifTrue, ifFalse],
-        name: "if"
-      }
+      let node = graph->addTypedNode("If", ty, constraints)
+      let test = graph->addExprNode(test, constraints)
+      graph->addLabeledEdge(node, test, "test")->ignore
+      let ifTrue = graph->addExprNode(ifTrue, constraints)
+      graph->addLabeledEdge(node, ifTrue, "true branch")->ignore
+      let ifFalse = graph->addExprNode(ifFalse, constraints)
+      graph->addLabeledEdge(node, ifFalse,"false branch")->ignore
+      node
     }
     | Rel(left, op, right, ty) => {
-      let left = exprToRawNodeDatum(left, constraints)
-      let right = exprToRawNodeDatum(right, constraints)
-      {
-        attributes: makeAttributes(~ty, ~constraints, ~mainValueName="operator", "Rel"),
-        children: [left, right],
-        name: AST.relToFriendlyString(op)
-      }
+      let left = graph->addExprNode(left, constraints)
+      let right = graph->addExprNode(right, constraints)
+      let node = graph->addTypedNode(`Rel\noperator = ${op->relToFriendlyString}`, ty, constraints)
+      graph->addEdge(node, left)->ignore
+      graph->addEdge(node, right)->ignore
+      node
     }
     | Application(fun, arg, ty) => {
-      let fun = exprToRawNodeDatum(fun, constraints)
-      let arg = exprToRawNodeDatum(arg, constraints)
-      {
-        attributes: makeAttributes(~ty, ~constraints, "Application"),
-        children: [fun, arg],
-        name: "function application"
-      }
+      let fun = graph->addExprNode(fun, constraints)
+      let arg = graph->addExprNode(arg, constraints)
+      let node = graph->addTypedNode("Application", ty, constraints)
+      graph->addEdge(node, fun)->ignore
+      graph->addEdge(node, arg)->ignore
+      node
     }
     | Cons(head, tail, ty) => {
-      let head = exprToRawNodeDatum(head, constraints)
-      let tail = exprToRawNodeDatum(tail, constraints)
-      {
-        attributes: makeAttributes(~ty, ~constraints, "Cons"),
-        children: [head, tail],
-        name: "::"
-      }
+      let head = graph->addExprNode(head, constraints)
+      let tail = graph->addExprNode(tail, constraints)
+      let node = graph->addTypedNode("Cons\n::", ty, constraints)
+      graph->addEdge(node, head)->ignore
+      graph->addEdge(node, tail)->ignore
+      node
     }
   }
 }
 
-let astToRawNodeDatum = (ast: AST.ast<Type.typeType>, constraints: Type.constraints): Tree.rawNodeDatum => {
+let addASTNode = (graph: graph, ast: AST.ast<Type.typeType>, constraints: Type.constraints): Node.t => {
   open AST
 
   switch ast {
     | Let(name, isRec, params, body, ty) => {
-      let params = params->Js.Array2.map(tokenToRawNodeDatum)
+      let node = graph->addTypedNode(`Let\nname = ${name.lexeme}\nrecursive? = ${isRec->Js.String2.make}`, ty, constraints)
+      let params = params->Js.Array2.map(graph->addTokenNode)
       params->Js.Array2.forEach(param =>
-        param.attributes->setInEdgeLabel("param")
+        graph->addLabeledEdge(node, param, "parameter")->ignore
       )
-      let body = exprToRawNodeDatum(body, constraints)
-      body.attributes->setInEdgeLabel("body")
-      let children = params
-      children->Js.Array2.push(body)->ignore
-      let attributes = makeAttributes(~ty, ~constraints, ~mainValueName="name", ~others=Js.Dict.fromArray([("isRec", Tree.boolToAttributeValue(isRec))]), "Let")
-      {attributes, children, name: name.lexeme}
+      let body = graph->addExprNode(body, constraints)
+      graph->addLabeledEdge(node, body, "body")->ignore
+      node
     }
-  }
-}
-
-// Bindings I couldn't find in Webapi
-@send external getBBox: Dom.element => Dom.svgRect = "getBBox"
-
-module SVGRect = {
-  @get external x: Dom.svgRect => float = "x"
-  @get external y: Dom.svgRect => float = "y"
-  @get external width: Dom.svgRect => float = "width"
-  @get external height: Dom.svgRect => float = "height"
-}
-
-module Node = {
-  @react.component
-  let make = (~nodeDatum: Tree.rawNodeDatum, ~nodeSizeCallback: (option<Tree.size> => option<Tree.size>) => ()) => {
-    open ReactDOM
-    open Tree
-    open Webapi.Dom
-    open Webapi.Dom.Element
-
-    let nodeType = nodeDatum.attributes->Js.Dict.get("nodeType")
-    let nodeTypeDisplay = switch nodeType {
-      | Some(nodeType) => <>{nodeType->attributeValueToReactElement}<br /></>
-      | None => React.null
-    }
-
-    let mainValue = switch nodeDatum.attributes->Js.Dict.get("mainValueName") {
-      | Some(mainValueName) => <>{mainValueName->attributeValueToReactElement}{" = "->React.string}{nodeDatum.name->Js.Json.serializeExn->React.string}</>
-      | None => React.null
-    }
-
-    let isRec = switch nodeDatum.attributes->Js.Dict.get("isRec") {
-      | Some(_) if nodeDatum.attributes->Js.Dict.unsafeGet("nodeType") == "Let"->stringToAttributeValue => <>{" (recursive) "->React.string}<br /></>
-      | _ => React.null
-    }
-
-    let textContainer = React.useRef(Js.Nullable.null)
-    let (height, setHeight) = React.useState(_ => 60.0)
-    let heightString = height->Belt.Float.toString
-    let heightPx = height->Belt.Float.toString ++ "px"
-    let translation = `translate(-60, -${(height/.2.0)->Belt.Float.toString})`
-
-    React.useEffect1(() => {
-      textContainer.current->Js.Nullable.toOption->Belt.Option.map((dom: Dom.element) => {
-        let rect: Dom.domRect = dom->getBoundingClientRect
-        let h = rect->DomRect.height
-        setHeight(originalHeight => Js.Math.max_float(originalHeight, h))
-        nodeSizeCallback(nodeSize => switch nodeSize {
-          | Some(nodeSize) if nodeSize.y < h => Some({x: 120.0, y: h})
-          | None => Some({x: 120.0, y: h})
-          | _ => nodeSize
-        })
-      })->ignore
-      None
-    }, [textContainer.current])
-
-    let divStyle = Style.make(~height=heightPx, ())
-    <g transform=translation height=heightString>
-      <rect height=heightString />
-      <foreignObject height=heightString>
-        <div xmlns="http://www.w3.org/1999/xhtml" style=divStyle>
-          <div className="text" ref=ReactDOM.Ref.domRef(textContainer)>
-            nodeTypeDisplay
-            isRec
-            mainValue
-          </div>
-        </div>
-      </foreignObject>
-    </g>
-  }
-}
-
-module LinkCmp = Belt.Id.MakeComparable({
-  type t = Tree.treeLinkDatum
-  let cmp = (a: t, b: t) => {
-    Pervasives.compare(
-      (a.source.x, a.source.y, a.target.x, a.target.y),
-      (b.source.x, b.source.y, b.target.x, b.target.y)
-    )
-  }
-})
-
-module Label = {
-  @react.component
-  let make = (~x: float, ~y: float, ~label: Tree.attributeValue) => {
-    open Belt.Float
-
-    let labelRef = React.useRef(Js.Nullable.null)
-    let (rect, setRect) = React.useState(_ => None)
-
-    React.useEffect1(() => {
-      labelRef.current->Js.Nullable.iter((. label) => {
-        let rect = label->getBBox
-        setRect(_ => Some(rect))
-      })
-      None
-    }, [labelRef.current])
-
-    let background = switch rect {
-      | Some(rect) => {
-        let backgroundX = rect->SVGRect.x
-        let backgroundY = rect->SVGRect.y
-        let width = rect->SVGRect.width
-        let height = rect->SVGRect.height
-        <rect x={backgroundX->toString} y={backgroundY->toString} width={width->toString} height={height->toString} className="label-background" />
-      }
-      | None => React.null
-    }
-
-    <>
-      background
-      <text x={x->toString} y={y->toString} className="label" ref=ReactDOM.Ref.domRef(labelRef)>{label->Tree.attributeValueToReactElement}</text>
-    </>
-  }
-}
-
-module Labels = {
-  @react.component
-  let make = (~wrapper: Dom.element, ~links: Belt.Set.Dict.t<Tree.treeLinkDatum, LinkCmp.identity>) => {
-    open Belt.Float
-
-    let labels = links->Belt.Set.Dict.toArray->Js.Array2.filter(({target}) => {
-      target.data.attributes->Js.Dict.get("inEdgeLabel")->Js.Option.isSome
-    })->Js.Array2.map(({source, target}) => {
-      let x = (source.x +. target.x)/.2.0
-      let y = (source.y +. target.y)/.2.0
-      let label = target.data.attributes->Js.Dict.unsafeGet("inEdgeLabel")
-      <Label x y label key=`label-${x->toString}-${y->toString}` />
-    })
-
-    ReactDOM.createPortal(labels->React.array, wrapper)
   }
 }
 
 @react.component
 let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   open GraphvizReact
-  open Tree
-  open Webapi.Dom.DomRect
-  open Webapi.Dom.Element
 
-  let dot = `digraph D {
+  let graph = digraph("AST")
+  graph->addASTNode(ast, constraints)->ignore
 
-    A [shape=diamond]
-    B [shape=box]
-    C [shape=circle]
-
-    A -> B [style=dashed, color=grey]
-    A -> C [color="black:invis:black"]
-    A -> D [penwidth=5, arrowhead=none]
-
-  }`
+  let dot = graph->toDot
 
   <div id="ast">
     <GraphvizReact dot />

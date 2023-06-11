@@ -24,7 +24,7 @@ module Edge = {
 }
 
 @send
-external addEdge: (graph, Node.t, string) => Edge.t = "addEdge"
+external addEdge: (graph, Node.t, Node.t) => Edge.t = "addEdge"
 
 @send
 external toDot: graph => string = "to_dot"
