@@ -1,4 +1,7 @@
-type graphvizOptions
+type graphvizOptions = {
+  width: Js.nullable<int>,
+  height: Js.nullable<int>
+}
 
 @bs.module("graphviz-react") @react.component
 external make: (

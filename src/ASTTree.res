@@ -206,6 +206,6 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   let dot = graph->toDot
 
   <div id="ast">
-    <GraphvizReact dot />
+    <GraphvizReact dot options={width: Js.Nullable.null, height: Js.Nullable.null} />
   </div>
 }
