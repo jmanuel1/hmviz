@@ -12,7 +12,9 @@ let freshID = () : string => {
 }
 
 let addUniqueNode = (graph: graph, label: string): Node.t => {
-  let attrs = Js.Dict.fromArray([("label", label), ("shape", "record")])
+  let attrs = Js.Dict.fromArray([("label", label), ("shape", "record"), ("fontname", "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif")])
   graph->addNodeWithAttributes(freshID(), attrs)
 }
 
