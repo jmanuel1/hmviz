@@ -46,12 +46,20 @@ let make = () => {
     })->ignore
   }
 
+  let goToFirstStep = event => {
+    setInferenceStepIndex(i => 0)
+  }
+
   let goToPreviousStep = event => {
     setInferenceStepIndex(i => i - 1)
   }
 
   let goToNextStep = event => {
     setInferenceStepIndex(i => i + 1)
+  }
+
+  let goToLastStep = event => {
+    setInferenceStepIndex(i => inferenceSteps->Js.Array2.length - 1)
   }
 
   <div className="App">
@@ -72,8 +80,11 @@ let make = () => {
           React.string("")
         }
       }
+      // TODO: Replace with a good pagination component?
+      <button onClick=goToFirstStep disabled={inferenceStepIndex <= 0}>{React.string("First step")}</button>
       <button onClick=goToPreviousStep disabled={inferenceStepIndex <= 0}>{React.string("Previous step")}</button>
       <button onClick=goToNextStep disabled={inferenceStepIndex >= inferenceSteps->Js.Array2.length - 1}>{React.string("Next step")}</button>
+      <button onClick=goToLastStep disabled={inferenceStepIndex >= inferenceSteps->Js.Array2.length - 1}>{React.string("Last step")}</button>
     </div>
     {
       switch typedAST {
