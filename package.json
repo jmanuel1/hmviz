@@ -26,6 +26,7 @@
     "postinstall": "rescript build -with-deps",
     "start:re": "rescript build -with-deps -w",
     "start:cra": "react-scripts start",
+    "clean": "rescript clean",
     "prebuild": "rescript clean build -with-deps"
   },
   "eslintConfig": null,
