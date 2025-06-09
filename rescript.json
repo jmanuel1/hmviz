@@ -1,8 +1,6 @@
 {
   "name": "hmviz",
-  "reason": {
-    "react-jsx": 3
-  },
+  "jsx": { "version": 4 },
   "sources": {
     "dir" : "src",
     "subdirs" : true
@@ -13,7 +11,7 @@
   ],
   "package-specs": [
     {
-      "module": "es6",
+      "module": "esmodule",
       "in-source": true
     }
   ],

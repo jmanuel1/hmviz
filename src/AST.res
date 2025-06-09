@@ -140,7 +140,7 @@ let parserAdvance : (parserState, int) => parserState = (state, incr) => {
   {index: state.index + incr}
 }
 
-let parseKeyword : string => parser<token> = (keyword, tokens, state) => {
+let parseKeyword : string => parser<token> = keyword => (tokens, state) => {
   if Js.Array.length(tokens) <= state.index {
     Error(`keyword ${keyword}`, state)
   } else {
@@ -154,7 +154,7 @@ let parseKeyword : string => parser<token> = (keyword, tokens, state) => {
 }
 
 let optional : parser<'a> => parser<option<'a>> =
-  (parser, tokens, state) => {
+  parser => (tokens, state) => {
     parser(tokens, state)->Belt.Result.mapWithDefault(Ok(None, state), ((res, state)) => Ok(Some(res), state))
   }
 
@@ -169,15 +169,15 @@ let parseID : parser<token> = (tokens, state) => {
   }
 }
 
-let map : parser<'a> => ('a => 'b) => parser<'b> = (parser, f) => {
+let map : (parser<'a>, 'a => 'b) => parser<'b> = (parser, f) => {
   (tokens, state) => {
     parser(tokens, state)->Belt.Result.map(((res, state)) => (f(res), state))
   }
 }
 
-let return : parser<'a> => 'b => parser<'b> = (parser, val) => parser->map(_ => val)
+let return : (parser<'a>, 'b) => parser<'b> = (parser, val) => parser->map(_ => val)
 
-let many : parser<'a> => parser<array<'a>> = (parser, tokens, state) => {
+let many : parser<'a> => parser<array<'a>> = parser => (tokens, state) => {
   let results = []
   let state = ref(state)
   while parser(tokens, state.contents)->Belt.Result.isOk {
@@ -196,7 +196,7 @@ let parseNotEOF : parser<()> = (tokens, state) => {
   }
 }
 
-let parseSymbol : string => parser<token> = (symbol, tokens, state) => {
+let parseSymbol : string => parser<token> = symbol => (tokens, state) => {
   parseNotEOF(tokens, state)->Belt.Result.flatMap((_) => {
     switch tokens[state.index] {
       | {type_: Symbol, lexeme: s} => if (s == symbol) {
@@ -207,15 +207,15 @@ let parseSymbol : string => parser<token> = (symbol, tokens, state) => {
   })
 }
 
-let parserAnd : parser<'a> => parser<'b> => parser<('a, 'b)> = (first, second) => {
+let parserAnd : (parser<'a>, parser<'b>) => parser<('a, 'b)> = (first, second) => {
   (tokens, state) => {
     first(tokens, state)->Belt.Result.flatMap(((firstRes, state)) => {
-      second->map((secondRes) => (firstRes, secondRes), tokens, state)
+      map(second, secondRes => (firstRes, secondRes))(tokens, state)
     })
   }
 }
 
-let or : parser<'a> => parser<'a> => parser<'a> = (first, second, tokens, state) => {
+let or : (parser<'a>, parser<'a>) => parser<'a> = (first, second) => (tokens, state) => {
   switch first(tokens, state) {
     | Ok(res) => Ok(res)
     // TODO: Construct an error message that includes content from the first.
@@ -223,14 +223,14 @@ let or : parser<'a> => parser<'a> => parser<'a> = (first, second, tokens, state)
   }
 }
 
-let alt : array<parser<'a>> => parser<'a> = (alternatives, tokens, state) => {
+let alt : array<parser<'a>> => parser<'a> = alternatives => (tokens, state) => {
   alternatives->Belt.Array.reduce(Error("", state), (res, parser) => switch res {
     | Ok(res) => Ok(res)
     | Error(_) => parser(tokens, state)
   })
 }
 
-let seq : array<parser<'a>> => parser<array<'a>> = (parsers, tokens, state) => {
+let seq : array<parser<'a>> => parser<array<'a>> = parsers => (tokens, state) => {
   parsers->Js.Array2.reduce((res, parser) => {
     res->Belt.Result.flatMap(((results, state)) => {
       parser(tokens, state)->Belt.Result.flatMap(((r, state)) => Ok(results->Js.Array2.concat([r]), state))
@@ -238,15 +238,15 @@ let seq : array<parser<'a>> => parser<array<'a>> = (parsers, tokens, state) => {
   }, Ok([], state))
 }
 
-let skip : parser<'a> => parser<'b> => parser<'a> = (first, second) => {
-  first->parserAnd(second)->map(((firstRes, _)) => firstRes)
+let skip : (parser<'a>, parser<'b>) => parser<'a> = (first, second) => {
+  first->parserAnd(second)->map(fst)
 }
 
-let then : parser<'a> => parser<'b> => parser<'b> = (first, second) => {
-  first->parserAnd(second)->map(((_, secondRes)) => secondRes)
+let then : (parser<'a>, parser<'b>) => parser<'b> = (first, second) => {
+  first->parserAnd(second)->map(snd)
 }
 
-let failWhen : parser<'a> => ('a => bool) => parser<'a> = (parser, predicate) => {
+let failWhen : (parser<'a>, ('a => bool)) => parser<'a> = (parser, predicate) => {
   (tokens, state) => {
     parser(tokens, state)->Belt.Result.flatMap(((res, state)) => {
       if (predicate(res)) {
@@ -258,12 +258,12 @@ let failWhen : parser<'a> => ('a => bool) => parser<'a> = (parser, predicate) =>
   }
 }
 
-let fail : parser<'a> => ~msg:string=? => parser<()> = (parser, ~msg="error", tokens, state) => switch parser(tokens, state) {
+let fail : (parser<'a>, ~msg:string=?) => parser<()> = (parser, ~msg="error") => (tokens, state) => switch parser(tokens, state) {
   | Ok(_) => Error(msg, state)
   | Error(_) => Ok((), state)
 }
 
-let sepBy : parser<'a> => parser<'b> => ~min: int=? => parser<array<'a>> = (parser, sep, ~min=0) => {
+let sepBy : (parser<'a>, parser<'b>, ~min: int=?) => parser<array<'a>> = (parser, sep, ~min=0) => {
   parser->optional->map(first => first->Belt.Option.mapWithDefault([], f => [f]))->parserAnd(
     sep->then(parser)->many
   )->map(((first, rest)) => first->Js.Array2.concat(rest))->failWhen(
@@ -271,11 +271,11 @@ let sepBy : parser<'a> => parser<'b> => ~min: int=? => parser<array<'a>> = (pars
   )
 }
 
-let wrapLazy : Lazy.t<parser<'a>> => parser<'a> = (parser, tokens, state) => {
-  Lazy.force(parser, tokens, state)
+let wrapLazy : Lazy.t<parser<'a>> => parser<'a> = parser => (tokens, state) => {
+  Lazy.force(parser)(tokens, state)
 }
 
-let trace : parser<'a> => string => parser<'a> = (parser, msg, tokens, state) => {
+let trace : (parser<'a>, string) => parser<'a> = (parser, msg) => (tokens, state) => {
   let res = parser(tokens, state)
   switch res {
     | Ok((_, state)) => {
@@ -304,7 +304,7 @@ let makePairs : array<expr<()>> => result<expr<()>, string> = exprs => {
   }
 }
 
-let fallibleMap : parser<'a> => ('a => result<'b, string>) => parser<'b> = (parser, f, tokens, state) => {
+let fallibleMap : (parser<'a>, ('a => result<'b, string>)) => parser<'b> = (parser, f) => (tokens, state) => {
   open ResultUtil
   parser(tokens, state)->Belt.Result.flatMap(((res, state)) => {
     f(res)->Belt.Result.map(fres => (fres, state))->mapError(e => (e, state))
@@ -439,5 +439,5 @@ let parseLet : parser<ast<()>> = {
 let parseEOF : parser<()> = parseNotEOF->fail(~msg="end of file")
 
 let parse : array<token> => result<ast<()>, (string, parserState)> = tokens => {
-  parseLet->skip(parseEOF, tokens, {index: 0})->Belt.Result.map(((ast, _)) => ast)
+  (parseLet->skip(parseEOF))(tokens, {index: 0})->Belt.Result.map(((ast, _)) => ast)
 }

@@ -53,7 +53,7 @@ let rec addPatternNode = (graph: graph, pat: AST.pattern): Node.t => {
       node
     }
     | ListPat(patterns) => {
-      let patterns = patterns->Js.Array2.map(addPatternNode(graph))
+      let patterns = patterns->Js.Array2.map(p => addPatternNode(graph, p))
       let fields = [
         "List Pattern",
         "[]"
@@ -185,7 +185,7 @@ let addASTNode = (graph: graph, ast: AST.ast<Type.typeType>, constraints: Type.c
         boxLabelToField(makeBoxLabel(~text=`recursive? = ${isRec->Js.String2.make}`, ()))
       ]
       let node = graph->addTypedNode(makeRecordLabel(fields), ty, constraints)
-      let params = params->Js.Array2.map(graph->addTokenNode)
+      let params = params->Js.Array2.map(p => graph->addTokenNode(p))
       params->Js.Array2.forEach(param =>
         graph->addLabeledEdge(node, param, "parameter")->ignore
       )

@@ -2387,10 +2387,10 @@
     schema-utils "^4.2.0"
     source-map "^0.7.3"
 
-"@rescript/react@^0.10.3":
-  version "0.10.3"
-  resolved "https://registry.yarnpkg.com/@rescript/react/-/react-0.10.3.tgz#a2a8bed6b017940ec26c2154764b350f50348889"
-  integrity sha512-Lf9rzrR3bQPKJjOK3PBRa/B3xrJ7CqQ1HYr9VHPVxJidarIJJFZBhj0Dg1uZURX+Wg/xiP0PHFxXmdj2bK8Vxw==
+"@rescript/react@^0.13.1":
+  version "0.13.1"
+  resolved "https://registry.yarnpkg.com/@rescript/react/-/react-0.13.1.tgz#19a90b2de39e4742bf73f834fe795fa9db5e06d5"
+  integrity sha512-VIWtu/sAJyYmDVoAhit0LHDYQrW6RqZ6z8sh8san5cjEAT4klv8JWkiaSK3FGUfooUDkGUXXgKTkqyj8zRR21w==
 
 "@rollup/plugin-babel@^5.2.0":
   version "5.3.1"
@@ -9460,15 +9460,15 @@ requires-port@^1.0.0:
   resolved "https://registry.yarnpkg.com/requires-port/-/requires-port-1.0.0.tgz#925d2601d39ac485e091cf0da5c6e694dc3dcaff"
   integrity sha1-kl0mAdOaxIXgkc8NpcbmlNw9yv8=
 
-rescript-webapi@^0.7.0:
-  version "0.7.0"
-  resolved "https://registry.yarnpkg.com/rescript-webapi/-/rescript-webapi-0.7.0.tgz#f8c61bf7383c82b6fe180ad045e16cb43b6299c0"
-  integrity sha512-fA1LPXSmQY3HtcIStQ2sHu9Xye1XLxd4JvkGQMupux9Q6Tp/jbcdh7bnCaGwHW6aI1QFmTmA/xWxUMb6oPphsQ==
+rescript-webapi@^0.10.0:
+  version "0.10.0"
+  resolved "https://registry.yarnpkg.com/rescript-webapi/-/rescript-webapi-0.10.0.tgz#8a2e65dd73f7cd1c8130d01ecb02e37b400eac91"
+  integrity sha512-QgwMMQO7INz0SK8TX91ibGDrOCRAteOuOxhQi3CIR8FMx0wykbp2rRU/TF4GyfKagk2Nby8snPhQnstSxnmm/g==
 
-rescript@^9.1.4:
-  version "9.1.4"
-  resolved "https://registry.yarnpkg.com/rescript/-/rescript-9.1.4.tgz#1eb126f98d6c16942c0bf0df67c050198e580515"
-  integrity sha512-aXANK4IqecJzdnDpJUsU6pxMViCR5ogAxzuqS0mOr8TloMnzAjJFu63fjD6LCkWrKAhlMkFFzQvVQYaAaVkFXw==
+rescript@^11.1.4:
+  version "11.1.4"
+  resolved "https://registry.yarnpkg.com/rescript/-/rescript-11.1.4.tgz#9a42ebc4fc5363707e39cef5b3188160b63bee42"
+  integrity sha512-0bGU0bocihjSC6MsE3TMjHjY0EUpchyrREquLS8VsZ3ohSMD+VHUEwimEfB3kpBI1vYkw3UFZ3WD8R28guz/Vw==
 
 resolve-cwd@^3.0.0:
   version "3.0.0"
