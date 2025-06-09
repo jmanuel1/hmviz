@@ -86,6 +86,7 @@ let make = () => {
       <button onClick=goToNextStep disabled={inferenceStepIndex >= inferenceSteps->Js.Array2.length - 1}>{React.string("Next step")}</button>
       <button onClick=goToLastStep disabled={inferenceStepIndex >= inferenceSteps->Js.Array2.length - 1}>{React.string("Last step")}</button>
     </div>
+    <ConstraintTable constraints />
     {
       switch typedAST {
         | Some(typedAST) => <ASTTree ast=typedAST constraints />
