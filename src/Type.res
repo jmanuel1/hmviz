@@ -2,17 +2,6 @@ type typeVar = int
 
 type rec typeType = TypeVar(typeVar) | TypeInt | TypeFloat | TypeString | TypeFun(typeType, typeType) | TypePair(typeType, typeType) | TypeList(typeType) | TypeBool
 
-module Cmp = Belt.Id.MakeComparable({
-  type t = typeType
-  let cmp = Pervasives.compare
-})
-
-module Hash = Belt.Id.MakeHashable({
-  type t = typeType
-  let hash = Hashtbl.hash
-  and eq = (a, b) => Pervasives.compare(a, b) == 0
-})
-
 let rec typeToString : typeType => string = ty => {
   switch ty {
     | TypeVar(v) => `TypeVar(${v->Belt.Int.toString})`
