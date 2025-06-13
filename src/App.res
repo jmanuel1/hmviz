@@ -3,8 +3,7 @@
 @react.component
 let make = () => {
   open AST
-  open Type
-  open ArrayUtil
+  open Ty
 
   let (codeInput, setCodeInput) = React.useState(_ => "")
   let (inferenceSteps, setInferenceSteps) = React.useState(_ => [])

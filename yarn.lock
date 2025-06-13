@@ -2387,6 +2387,11 @@
     schema-utils "^4.2.0"
     source-map "^0.7.3"
 
+"@rescript/core@^1.6.1":
+  version "1.6.1"
+  resolved "https://registry.yarnpkg.com/@rescript/core/-/core-1.6.1.tgz#159670c94d64a2b8236f46be2bf09a007b1ece08"
+  integrity sha512-vyb5k90ck+65Fgui+5vCja/mUfzKaK3kOPT4Z6aAJdHLH1eljEi1zKhXroCiCtpNLSWp8k4ulh1bdB5WS0hvqA==
+
 "@rescript/react@^0.13.1":
   version "0.13.1"
   resolved "https://registry.yarnpkg.com/@rescript/react/-/react-0.13.1.tgz#19a90b2de39e4742bf73f834fe795fa9db5e06d5"

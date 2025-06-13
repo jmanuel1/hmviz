@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@rescript/core": "^1.6.1",
     "@rescript/react": "^0.13.1",
     "@testing-library/react": "^11.2.7",
     "@testing-library/user-event": "^12.8.3",

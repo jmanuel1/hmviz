@@ -7,7 +7,8 @@
   },
   "bsc-flags": [
     "-bs-super-errors",
-    "-bs-no-version-header"
+    "-bs-no-version-header",
+    "-open RescriptCore"
   ],
   "package-specs": [
     {
@@ -19,6 +20,7 @@
   "namespace": true,
   "bs-dependencies": [
     "@rescript/react",
+    "@rescript/core",
     "rescript-webapi"
   ],
   "bs-dev-dependencies": [

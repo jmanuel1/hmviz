@@ -1,5 +1,5 @@
 @react.component
-let make = (~constraints: Type.constraints) => {
+let make = (~constraints: Ty.constraints) => {
   <table>
     <thead>
       <tr>
@@ -11,8 +11,8 @@ let make = (~constraints: Type.constraints) => {
       {
         constraints->Belt.Map.Int.toArray->Js.Array2.map(((var, ty)) => {
           <tr key=Belt.Int.toString(var)>
-            <td>{Type.TypeVar(var)->Type.toFriendlyString->React.string}</td>
-            <td>{ty->Type.toFriendlyString->React.string}</td>
+            <td>{Ty.TypeVar(var)->Ty.toFriendlyString->React.string}</td>
+            <td>{ty->Ty.toFriendlyString->React.string}</td>
           </tr>
         })->React.array
       }

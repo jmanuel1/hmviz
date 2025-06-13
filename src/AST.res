@@ -44,21 +44,21 @@ let rec nextToken : (string, tokenizerState) => option<(token, tokenizerState)> 
       Js.Option.andThen((. match) => {
         nextToken(string, state->advance(Js.String.length(match)))
 
-      }, Js.toOption(Js.Re.captures(wsResult)[0]))
+      }, Js.toOption(Js.Re.captures(wsResult)->Array.getUnsafe(0)))
     }
     | None => None
   }->Js.Option.firstSome(Js.Option.andThen((. result) => {
     Js.Option.map((. match) => {
       ({type_: Keyword, lexeme: match}, state->advance(Js.String.length(match)))
-    }, Js.toOption(Js.Re.captures(result)[0]))
+    }, Js.toOption(Js.Re.captures(result)->Array.getUnsafe(0)))
   }, letResult))->Js.Option.firstSome(Js.Option.andThen((. result) => {
     Js.Option.map((. match) => {
       ({type_: Symbol, lexeme: match}, state->advance(Js.String.length(match)))
-    }, Js.toOption(Js.Re.captures(result)[0]))
+    }, Js.toOption(Js.Re.captures(result)->Array.getUnsafe(0)))
   }, symbolResult))->Js.Option.firstSome(Js.Option.andThen((. result) => {
     Js.Option.map((. match) => {
       ({type_: ID, lexeme: match}, state->advance(Js.String.length(match)))
-    }, Js.toOption(Js.Re.captures(result)[0]))
+    }, Js.toOption(Js.Re.captures(result)->Array.getUnsafe(0)))
   }, idResult))
 }
 
@@ -144,9 +144,10 @@ let parseKeyword : string => parser<token> = keyword => (tokens, state) => {
   if Js.Array.length(tokens) <= state.index {
     Error(`keyword ${keyword}`, state)
   } else {
-    switch tokens[state.index] {
+    let currentToken = tokens->Array.getUnsafe(state.index)
+    switch currentToken {
       | {type_: Keyword, lexeme: k} => if (k == keyword) {
-        Ok((tokens[state.index], state->parserAdvance(1)))
+        Ok(currentToken, state->parserAdvance(1))
       } else { Error(`keyword ${keyword}`, state) }
       | _ => Error(`keyword ${keyword}`, state)
     }
@@ -162,8 +163,9 @@ let parseID : parser<token> = (tokens, state) => {
   if Js.Array.length(tokens) <= state.index {
     Error("id", state)
   } else {
-    switch tokens[state.index] {
-      | {type_: ID, lexeme: _} => Ok((tokens[state.index], state->parserAdvance(1)))
+    let currentToken = tokens->Array.getUnsafe(state.index)
+    switch currentToken {
+      | {type_: ID, lexeme: _} => Ok(currentToken, state->parserAdvance(1))
       | _ => Error("id", state)
     }
   }
@@ -198,9 +200,11 @@ let parseNotEOF : parser<()> = (tokens, state) => {
 
 let parseSymbol : string => parser<token> = symbol => (tokens, state) => {
   parseNotEOF(tokens, state)->Belt.Result.flatMap((_) => {
-    switch tokens[state.index] {
+    let currentToken = tokens->Array.getUnsafe(state.index)
+
+    switch currentToken {
       | {type_: Symbol, lexeme: s} => if (s == symbol) {
-        Ok((tokens[state.index], state->parserAdvance(1)))
+        Ok((currentToken, state->parserAdvance(1)))
       } else { Error(`symbol ${symbol}`, state) }
       | _ => Error(`symbol ${symbol}`, state)
     }
@@ -291,21 +295,21 @@ let trace : (parser<'a>, string) => parser<'a> = (parser, msg) => (tokens, state
 let rec makePairPattern : array<pattern> => result<pattern, string> = patterns => {
   switch patterns->Js.Array.length {
   | 0 | 1 => Error("at least 2 elements")
-  | 2 => Ok(PairPat(patterns[0], patterns[1]))
-  | _ => makePairPattern(Js.Array.sliceFrom(1, patterns))->Belt.Result.map(rest => PairPat(patterns[0], rest))
+  | 2 => Ok(PairPat(patterns->Array.getUnsafe(0), patterns->Array.getUnsafe(1)))
+  | _ => makePairPattern(Js.Array.sliceFrom(1, patterns))->Belt.Result.map(rest => PairPat(patterns->Array.getUnsafe(0), rest))
   }
 }
 
 let makePairs : array<expr<()>> => result<expr<()>, string> = exprs => {
-  open ArrayUtil
+  open Array
   switch exprs->Js.Array.length {
   | 0 | 1 => Error("at least 2 elements")
-  | _ => Ok(exprs->Js.Array2.slice(~start=0, ~end_=-1)->Js.Array2.reduceRight((rest, el) => Pair(el, rest, ()), exprs->last))
+  | _ => Ok(exprs->Js.Array2.slice(~start=0, ~end_=-1)->Js.Array2.reduceRight((rest, el) => Pair(el, rest, ()), exprs->last->Option.getUnsafe))
   }
 }
 
 let fallibleMap : (parser<'a>, ('a => result<'b, string>)) => parser<'b> = (parser, f) => (tokens, state) => {
-  open ResultUtil
+  open Result
   parser(tokens, state)->Belt.Result.flatMap(((res, state)) => {
     f(res)->Belt.Result.map(fres => (fres, state))->mapError(e => (e, state))
   })
@@ -378,7 +382,7 @@ and let parseIf : Lazy.t<parser<expr<()>>> = lazy (
   ->or(parseConjunction->wrapLazy)
 )
 // & &&
-and let parseConjunction : Lazy.t<parser<expr<'ann>>> = lazy (
+and let parseConjunction : Lazy.t<parser<expr<()>>> = lazy (
   parseRelational->wrapLazy
 )
 // =… <… >… |… &… $… !=
@@ -388,7 +392,7 @@ and let parseRelational : Lazy.t<parser<expr<()>>> = lazy (
   ->map(((first, opPairs)) => opPairs->Belt.Array.reduce(first, (expr, (op, operand)) => Rel(expr, op, operand, ())))
   ->trace("relational")
 )
-and let parseNegation : Lazy.t<parser<expr<'ann>>> = lazy (
+and let parseNegation : Lazy.t<parser<expr<()>>> = lazy (
   parseApplication->wrapLazy
 )
 and let parseApplication : Lazy.t<parser<expr<()>>> = lazy (
@@ -402,7 +406,7 @@ and let parsePrimary : Lazy.t<parser<expr<()>>> = lazy (
     ->then(parseExpr->wrapLazy->sepBy(parseSymbol(","), ~min=1))
     ->fallibleMap(exprs =>
       switch exprs->Js.Array.length {
-        | 1 => Ok(exprs[0])
+        | 1 => Ok(exprs->Array.getUnsafe(0))
         | _ => makePairs(exprs)
       }
     )->skip(parseSymbol(")")),

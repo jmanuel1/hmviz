@@ -91,13 +91,13 @@ let rec addPatternNode = (graph: graph, pat: AST.pattern): Node.t => {
   }
 }
 
-let addTypedNode = (graph: graph, id: string, ty: Type.typeType, constraints: Type.constraints): Node.t => {
-  open Type
+let addTypedNode = (graph: graph, id: string, ty: Ty.typeType, constraints: Ty.constraints): Node.t => {
+  open Ty
 
   graph->addUniqueNode(makeRecordLabel([flipLayout(makeRecordLabel([id, boxLabelToField(makeBoxLabel(~text=`type = ${ty->substitute(constraints)->toFriendlyString}`, ()))]))]))
 }
 
-let rec addClauseNode = (graph: graph, clause: AST.clause<Type.typeType>, constraints: Type.constraints): Node.t => {
+let rec addClauseNode = (graph: graph, clause: AST.clause<Ty.typeType>, constraints: Ty.constraints): Node.t => {
   let (pattern, body) = clause
   let pattern = graph->addPatternNode(pattern)
   let body = graph->addExprNode(body, constraints)
@@ -106,7 +106,7 @@ let rec addClauseNode = (graph: graph, clause: AST.clause<Type.typeType>, constr
   graph->addEdge(node, body)->ignore
   node
 }
-and addExprNode = (graph: graph, e: AST.expr<Type.typeType>, constraints: Type.constraints): Node.t => {
+and addExprNode = (graph: graph, e: AST.expr<Ty.typeType>, constraints: Ty.constraints): Node.t => {
   open AST
 
   switch e {
@@ -174,7 +174,7 @@ and addExprNode = (graph: graph, e: AST.expr<Type.typeType>, constraints: Type.c
   }
 }
 
-let addASTNode = (graph: graph, ast: AST.ast<Type.typeType>, constraints: Type.constraints): Node.t => {
+let addASTNode = (graph: graph, ast: AST.ast<Ty.typeType>, constraints: Ty.constraints): Node.t => {
   open AST
 
   switch ast {
@@ -197,7 +197,7 @@ let addASTNode = (graph: graph, ast: AST.ast<Type.typeType>, constraints: Type.c
 }
 
 @react.component
-let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
+let make = (~ast: AST.ast<Ty.typeType>, ~constraints: Ty.constraints) => {
   open GraphvizReact
 
   let graph = digraph("AST")
