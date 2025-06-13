@@ -9,8 +9,8 @@ let make = (~constraints: Ty.constraints) => {
     </thead>
     <tbody>
       {
-        constraints->Belt.Map.Int.toArray->Js.Array2.map(((var, ty)) => {
-          <tr key=Belt.Int.toString(var)>
+        constraints->Belt.Map.Int.toArray->Array.map(((var, ty)) => {
+          <tr key=Int.toString(var)>
             <td>{Ty.TypeVar(var)->Ty.toFriendlyString->React.string}</td>
             <td>{ty->Ty.toFriendlyString->React.string}</td>
           </tr>

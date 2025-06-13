@@ -4,7 +4,7 @@ type rec typeType = TypeVar(typeVar) | TypeInt | TypeFloat | TypeString | TypeFu
 
 let rec typeToString : typeType => string = ty => {
   switch ty {
-    | TypeVar(v) => `TypeVar(${v->Belt.Int.toString})`
+    | TypeVar(v) => `TypeVar(${v->Int.toString})`
     | TypeInt => "TypeInt"
     | TypeFloat => "TypeFloat"
     | TypeString => "TypeString"
@@ -17,7 +17,7 @@ let rec typeToString : typeType => string = ty => {
 
 let rec toFriendlyString = (ty: typeType): string => {
   switch ty {
-    | TypeVar(v) => `'t${v->Belt.Int.toString}`
+    | TypeVar(v) => `'t${v->Int.toString}`
     | TypeInt => "int"
     | TypeFloat => "float"
     | TypeString => "string"
@@ -52,11 +52,11 @@ let annotateWithTypeVars : (AST.ast<'ann>, typeVar) => (AST.ast<typeType>, typeV
     switch expr {
       | Match(scrutinee, clauses, _) => {
         let (typedScrutinee, nextTypeVar) = annotateExpr(scrutinee, nextTypeVar)
-        let (typedClauses, nextTypeVar) = clauses->Js.Array2.reduce(((typedClauses, nextTypeVar), (pattern, body)) => {
+        let (typedClauses, nextTypeVar) = clauses->Array.reduce(([], nextTypeVar), ((typedClauses, nextTypeVar), (pattern, body)) => {
           let (typedClauseBody, nextTypeVar) = annotateExpr(body, nextTypeVar)
-          typedClauses->Js.Array2.push((pattern, typedClauseBody))->ignore
+          typedClauses->Array.push((pattern, typedClauseBody))->ignore
           (typedClauses, nextTypeVar)
-        }, ([], nextTypeVar))
+        })
         (Match(typedScrutinee, typedClauses, TypeVar(nextTypeVar)), nextTypeVar + 1)
       }
       | Pair(first, second, _) => {
@@ -192,13 +192,13 @@ let stepInfer : typeInferer<()> = {
       | ListPat(patterns) => {
         freshTypeVar->TracedState.flatMap(v => {
           let elementTypeVar = TypeVar(v)
-          patterns->Js.Array2.reduce((ma, pattern) => {
+          patterns->Array.reduce(TracedState.return(()), (ma, pattern) => {
             ma->TracedState.flatMap(_ => {
               stepInferPattern(pattern)->TracedState.flatMap(patternType => {
                 unify(patternType, elementTypeVar)
               })
             })
-          }, TracedState.return(()))->TracedState.map(_ => TypeList(elementTypeVar))
+          })->TracedState.map(_ => TypeList(elementTypeVar))
         })
       }
       | ConsPat(head, tail) => {
@@ -223,17 +223,17 @@ let stepInfer : typeInferer<()> = {
     switch expr {
       | Match(scrutinee, clauses, ty) => {
         stepInferExpr(scrutinee)->TracedState.flatMap(((scrutineeType, scrutinee)) => {
-          clauses->Js.Array2.reduce((ma, (pattern, body)) => {
+          clauses->Array.reduce(TracedState.return([]), (ma, (pattern, body)) => {
             ma->TracedState.flatMap(prevClauses => withBindingContext(
               stepInferPattern(pattern)->TracedState.flatMap(patternType => {
                 unify(patternType, scrutineeType)->TracedState.flatMap(_ => {
                   stepInferExpr(body)->TracedState.flatMap(((bodyType, body)) => {
-                    unify(bodyType, ty)->TracedState.map(_ => prevClauses->Js.Array2.concat([(pattern, body)]))
+                    unify(bodyType, ty)->TracedState.map(_ => prevClauses->Array.concat([(pattern, body)]))
                   })
                 })
               })
             ))
-          }, TracedState.return([]))->TracedState.flatMap(clauses => {
+          })->TracedState.flatMap(clauses => {
             TracedState.mark->TracedState.map(_ => (ty, Match(scrutinee, clauses, ty)))
           })
         })
@@ -317,12 +317,12 @@ let stepInfer : typeInferer<()> = {
   getAST->TracedState.flatMap(ast => {
     switch ast {
       | Let(name, isRec, params, body, ty) => {
-        let buildContext = params->Js.Array2.reduce((contextBuilder, param) => {
+        let buildContext = params->Array.reduce(TracedState.return(()), (contextBuilder, param) => {
           contextBuilder->TracedState.flatMap(_ => {
             // TODO: Annotate params with types
             freshTypeVar->TracedState.flatMap(v => bind(param.lexeme, TypeVar(v)))
           })
-        }, TracedState.return(()))->TracedState.flatMap(_ => {
+        })->TracedState.flatMap(_ => {
           if isRec {
             bind(name.lexeme, ty)
           } else {

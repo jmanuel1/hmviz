@@ -4,7 +4,7 @@ type rec traceStep<'s, 'a> = Intermediate('s, traceStep<'s, 'a>) | Return('a, 's
 
 let rec toStateArray : traceStep<'s, 'a> => array<'s> = steps => {
   switch steps {
-    | Intermediate(state, steps) => [state]->Js.Array2.concat(steps->toStateArray)
+    | Intermediate(state, steps) => [state]->Array.concat(steps->toStateArray)
     | Return(_, state) => [state]
   }
 }

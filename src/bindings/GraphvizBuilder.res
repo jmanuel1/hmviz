@@ -11,7 +11,7 @@ module Node = {
 external digraph: string => graph = "digraph"
 
 @send
-external addNodeWithAttributes: (graph, string, Js.Dict.t<string>) => Node.t = "addNode"
+external addNodeWithAttributes: (graph, string, Dict.t<string>) => Node.t = "addNode"
 
 @send
 external addNode: (graph, string) => Node.t = "addNode"

@@ -1,6 +1,6 @@
 type graphvizOptions = {
-  width: Js.nullable<int>,
-  height: Js.nullable<int>
+  width: nullable<int>,
+  height: nullable<int>
 }
 
 @bs.module("graphviz-react") @react.component
