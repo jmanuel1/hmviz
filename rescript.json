@@ -1,19 +1,18 @@
 {
   "name": "hmviz",
-  "reason": {
-    "react-jsx": 3
-  },
+  "jsx": { "version": 4 },
   "sources": {
     "dir" : "src",
     "subdirs" : true
   },
   "bsc-flags": [
     "-bs-super-errors",
-    "-bs-no-version-header"
+    "-bs-no-version-header",
+    "-open RescriptCore"
   ],
   "package-specs": [
     {
-      "module": "es6",
+      "module": "esmodule",
       "in-source": true
     }
   ],
@@ -21,6 +20,7 @@
   "namespace": true,
   "bs-dependencies": [
     "@rescript/react",
+    "@rescript/core",
     "rescript-webapi"
   ],
   "bs-dev-dependencies": [

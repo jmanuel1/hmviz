@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@rescript/react": "^0.10.3",
+    "@rescript/core": "^1.6.1",
+    "@rescript/react": "^0.13.1",
     "@testing-library/react": "^11.2.7",
     "@testing-library/user-event": "^12.8.3",
     "bs-platform": "^8.4.2",
@@ -15,7 +16,7 @@
     "react-dom": "^16.8.1",
     "react-scripts": "^5.0.1",
     "reason-react": "^0.9.1",
-    "rescript-webapi": "^0.7.0",
+    "rescript-webapi": "^0.10.0",
     "web-vitals": "^1.1.2"
   },
   "scripts": {
@@ -43,6 +44,6 @@
     ]
   },
   "devDependencies": {
-    "rescript": "^9.1.4"
+    "rescript": "^11.1.4"
   }
 }

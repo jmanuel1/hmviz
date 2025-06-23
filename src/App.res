@@ -3,14 +3,13 @@
 @react.component
 let make = () => {
   open AST
-  open Type
-  open ArrayUtil
+  open Ty
 
   let (codeInput, setCodeInput) = React.useState(_ => "")
   let (inferenceSteps, setInferenceSteps) = React.useState(_ => [])
   let (inferenceStepIndex, setInferenceStepIndex) = React.useState(_ => 0)
-  let typedAST = inferenceSteps->Belt.Array.get(inferenceStepIndex)->Belt.Option.map(s => s.typedAST)
-  let constraints = inferenceSteps->Belt.Array.get(inferenceStepIndex)->Belt.Option.map(s => s.constraints)->Belt.Option.getWithDefault(Belt.Map.Int.empty)
+  let typedAST = inferenceSteps->Array.get(inferenceStepIndex)->Option.map(s => s.typedAST)
+  let constraints = inferenceSteps->Array.get(inferenceStepIndex)->Option.map(s => s.constraints)->Option.getOr(Belt.Map.Int.empty)
 
   let onCodeInputChange = event => {
     ReactEvent.Form.preventDefault(event)
@@ -22,25 +21,25 @@ let make = () => {
     ReactEvent.Form.preventDefault(event)
     let tokens = tokenize(codeInput)
 
-    tokens->Belt.Option.map(tokens => {
+    tokens->Option.map(tokens => {
       let ast = parse(tokens)
       switch ast {
         | Ok(ast) => {
           let steps = generateInferenceSteps(ast)->TracedState.toStateArray
-          steps->Js.Array2.forEach(step => {
-            Js.log("step:")
-            Js.log(step)
-            Js.log("constraints:")
+          steps->Array.forEach(step => {
+            Console.log("step:")
+            Console.log(step)
+            Console.log("constraints:")
             step.constraints->Belt.Map.Int.forEach((v, t) => {
-              Js.log(`var: ${v->Belt.Int.toString}, type: ${typeToString(t)}`)
+              Console.log(`var: ${v->Int.toString}, type: ${typeToString(t)}`)
             })
           })
           setInferenceSteps(_ => steps)
           setInferenceStepIndex(_ => 0)
         }
         | Error(msg, state) => {
-          Js.log(`expected ${msg}, saw following token at token index ${state.index->Belt.Int.toString}:`)
-          Js.log(tokens->Js.Array2.slice(~start=state.index, ~end_=state.index + 5))
+          Console.log(`expected ${msg}, saw following token at token index ${state.index->Int.toString}:`)
+          Console.log(tokens->Array.slice(~start=state.index, ~end=state.index + 5))
         }
       }
     })->ignore
@@ -59,7 +58,7 @@ let make = () => {
   }
 
   let goToLastStep = event => {
-    setInferenceStepIndex(i => inferenceSteps->Js.Array2.length - 1)
+    setInferenceStepIndex(i => inferenceSteps->Array.length - 1)
   }
 
   <div className="App">
@@ -74,8 +73,8 @@ let make = () => {
     </form>
     <div>
       {
-        if inferenceSteps->Js.Array2.length > 0 {
-          React.string(`Step ${(inferenceStepIndex + 1)->Js.String2.make}`)
+        if inferenceSteps->Array.length > 0 {
+          React.string(`Step ${(inferenceStepIndex + 1)->String.make}`)
         } else {
           React.string("")
         }
@@ -83,8 +82,8 @@ let make = () => {
       // TODO: Replace with a good pagination component?
       <button onClick=goToFirstStep disabled={inferenceStepIndex <= 0}>{React.string("First step")}</button>
       <button onClick=goToPreviousStep disabled={inferenceStepIndex <= 0}>{React.string("Previous step")}</button>
-      <button onClick=goToNextStep disabled={inferenceStepIndex >= inferenceSteps->Js.Array2.length - 1}>{React.string("Next step")}</button>
-      <button onClick=goToLastStep disabled={inferenceStepIndex >= inferenceSteps->Js.Array2.length - 1}>{React.string("Last step")}</button>
+      <button onClick=goToNextStep disabled={inferenceStepIndex >= inferenceSteps->Array.length - 1}>{React.string("Next step")}</button>
+      <button onClick=goToLastStep disabled={inferenceStepIndex >= inferenceSteps->Array.length - 1}>{React.string("Last step")}</button>
     </div>
     <ConstraintTable constraints />
     {

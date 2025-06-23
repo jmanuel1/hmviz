@@ -8,11 +8,11 @@ let nextID : ref<int> = ref(0)
 let freshID = () : string => {
   let id = nextID.contents
   nextID := nextID.contents + 1
-  id->Js.String2.make
+  id->String.make
 }
 
 let addUniqueNode = (graph: graph, label: string): Node.t => {
-  let attrs = Js.Dict.fromArray([("label", label), ("shape", "record"), ("fontname", "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  let attrs = Dict.fromArray([("label", label), ("shape", "record"), ("fontname", "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif")])
   graph->addNodeWithAttributes(freshID(), attrs)
@@ -53,13 +53,13 @@ let rec addPatternNode = (graph: graph, pat: AST.pattern): Node.t => {
       node
     }
     | ListPat(patterns) => {
-      let patterns = patterns->Js.Array2.map(addPatternNode(graph))
+      let patterns = patterns->Array.map(p => addPatternNode(graph, p))
       let fields = [
         "List Pattern",
         "[]"
       ]
       let node = makeNode(fields)
-      patterns->Js.Array2.forEach(pat => graph->addEdge(node, pat)->ignore)
+      patterns->Array.forEach(pat => graph->addEdge(node, pat)->ignore)
       node
     }
     | Wildcard => {
@@ -91,13 +91,13 @@ let rec addPatternNode = (graph: graph, pat: AST.pattern): Node.t => {
   }
 }
 
-let addTypedNode = (graph: graph, id: string, ty: Type.typeType, constraints: Type.constraints): Node.t => {
-  open Type
+let addTypedNode = (graph: graph, id: string, ty: Ty.typeType, constraints: Ty.constraints): Node.t => {
+  open Ty
 
   graph->addUniqueNode(makeRecordLabel([flipLayout(makeRecordLabel([id, boxLabelToField(makeBoxLabel(~text=`type = ${ty->substitute(constraints)->toFriendlyString}`, ()))]))]))
 }
 
-let rec addClauseNode = (graph: graph, clause: AST.clause<Type.typeType>, constraints: Type.constraints): Node.t => {
+let rec addClauseNode = (graph: graph, clause: AST.clause<Ty.typeType>, constraints: Ty.constraints): Node.t => {
   let (pattern, body) = clause
   let pattern = graph->addPatternNode(pattern)
   let body = graph->addExprNode(body, constraints)
@@ -106,7 +106,7 @@ let rec addClauseNode = (graph: graph, clause: AST.clause<Type.typeType>, constr
   graph->addEdge(node, body)->ignore
   node
 }
-and addExprNode = (graph: graph, e: AST.expr<Type.typeType>, constraints: Type.constraints): Node.t => {
+and addExprNode = (graph: graph, e: AST.expr<Ty.typeType>, constraints: Ty.constraints): Node.t => {
   open AST
 
   switch e {
@@ -114,8 +114,8 @@ and addExprNode = (graph: graph, e: AST.expr<Type.typeType>, constraints: Type.c
       let node = graph->addTypedNode("Pattern Match", ty, constraints)
       let scrutinee = graph->addExprNode(scrutinee, constraints)
       graph->addLabeledEdge(node, scrutinee, "scrutinee")->ignore
-      let children = clauses->Js.Array2.map(c => graph->addClauseNode(c, constraints))
-      children->Js.Array2.forEach(clause => graph->addEdge(node, clause)->ignore)
+      let children = clauses->Array.map(c => graph->addClauseNode(c, constraints))
+      children->Array.forEach(clause => graph->addEdge(node, clause)->ignore)
       node
     }
     | Pair(first, second, ty) => {
@@ -174,7 +174,7 @@ and addExprNode = (graph: graph, e: AST.expr<Type.typeType>, constraints: Type.c
   }
 }
 
-let addASTNode = (graph: graph, ast: AST.ast<Type.typeType>, constraints: Type.constraints): Node.t => {
+let addASTNode = (graph: graph, ast: AST.ast<Ty.typeType>, constraints: Ty.constraints): Node.t => {
   open AST
 
   switch ast {
@@ -182,11 +182,11 @@ let addASTNode = (graph: graph, ast: AST.ast<Type.typeType>, constraints: Type.c
       let fields = [
         "Let",
         boxLabelToField(makeBoxLabel(~text=`name = ${name.lexeme}`, ())),
-        boxLabelToField(makeBoxLabel(~text=`recursive? = ${isRec->Js.String2.make}`, ()))
+        boxLabelToField(makeBoxLabel(~text=`recursive? = ${isRec->String.make}`, ()))
       ]
       let node = graph->addTypedNode(makeRecordLabel(fields), ty, constraints)
-      let params = params->Js.Array2.map(graph->addTokenNode)
-      params->Js.Array2.forEach(param =>
+      let params = params->Array.map(p => graph->addTokenNode(p))
+      params->Array.forEach(param =>
         graph->addLabeledEdge(node, param, "parameter")->ignore
       )
       let body = graph->addExprNode(body, constraints)
@@ -197,7 +197,7 @@ let addASTNode = (graph: graph, ast: AST.ast<Type.typeType>, constraints: Type.c
 }
 
 @react.component
-let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
+let make = (~ast: AST.ast<Ty.typeType>, ~constraints: Ty.constraints) => {
   open GraphvizReact
 
   let graph = digraph("AST")
@@ -206,6 +206,6 @@ let make = (~ast: AST.ast<Type.typeType>, ~constraints: Type.constraints) => {
   let dot = graph->toDot
 
   <div id="ast">
-    <GraphvizReact dot options={width: Js.Nullable.null, height: Js.Nullable.null} />
+    <GraphvizReact dot options={width: Nullable.null, height: Nullable.null} />
   </div>
 }
